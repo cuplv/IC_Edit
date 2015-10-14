@@ -1,0 +1,27 @@
+To get graphics on my Mac
+=========================
+
+brew uninstall objective-caml
+brew install objective-caml --with-x11
+(follow error message to install xquartz and repeat previous)
+export DISPLAY=:0.0
+
+You may need to exit and rerun X11 if get the 'Cannot open display :0.0' error.
+
+test keypresses
+---------------
+
+ocaml graphics.cma
+# open Graphics;;
+# open_graph "";;
+# while true do match read_key()|>int_of_char with 27 -> failwith "test complete" |k -> print_int k; print_string ": "; k|>char_of_int|>print_char; print_newline() done;;
+
+Semantics options
+=================
+
+It's unclear how the multiple cursors should interact. Intuitively, we want the current cursor to 'move' while the other cursors 'remain in place'. However, there is no simple, general-purpose way to do that, since we are attempting to have no bias as to the direction of a cursor.
+
+some other questions:
+- should cursors save their direction, or leave it up to the user's 'mode'
+
+
