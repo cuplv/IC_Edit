@@ -15,13 +15,12 @@ module Seq = SpreadTree.MakeSeq(Insts.Nominal)(Name)(Types.Int)
 type cursor = string
 
 (* list with edit points *)
-type 'a clist =
-| Nil
-| Cursor of cursor * 'a clist
-| Data of 'a * 'a clist
+type 'a cdata =
+| Cursor of cursor
+| Data of 'a
 
 (* zipper for clists *)
-type 'a zip = 'a clist * cursor * 'a clist
+type 'a zip = 'a cdata list * cursor * 'a cdata list
 
 (* directions for cursor manipulation *)
 type dir = L | R
@@ -51,11 +50,11 @@ type 'a content = 'a zip
 let print_clist cl =
 	let rec p cl =
 		match cl with
-		| Nil -> print_string "]"
-		| Cursor(c,r) -> 
+		| [] -> print_string "]"
+		| Cursor(c)::r -> 
 			print_string ("Cursor(" ^ c ^ "); ");
 			p r
-		| Data(d,r) ->
+		| Data(d)::r ->
 			print_string ("Data; ");
 			p r
 	in
@@ -71,30 +70,30 @@ let other_dir dir =
 let rev_clist clist =
 	let rec rev h t =
 		match h with
-		| Nil -> t
-		| Cursor(c, rest) -> rev rest (Cursor(c, t))
-		| Data(d, rest) -> rev rest (Data(d, t))
+		| [] -> t
+		| Cursor(c)::rest -> rev rest (Cursor(c)::t)
+		| Data(d)::rest -> rev rest (Data(d)::t)
 	in
-	rev clist Nil
+	rev clist []
 
 let blank_editor cursor = 
 	match cursor with
-	| None -> (Nil, "undo_location", Nil)
+	| None -> ([], "undo_location", [])
 	| Some(cursor) -> 
 	(* read bottom-up *)
-	let gen_cur = 
-		Data(SwitchTo(cursor)
-		,Data(Make(cursor)
-		,Nil
-	)) in
-	(gen_cur, "undo_location", Nil)
+	let gen_cur =
+		[Data(SwitchTo(cursor))
+		;Data(Make(cursor))
+		]
+	in
+	(gen_cur, "undo_location", [])
 
 let zip_to_left (l,c,r) =
 	let rec flip_left l r =
 		match l with
-		| Nil -> (Nil, r)
-		| Cursor(c,rest) -> flip_left rest (Cursor(c,r))
-		| Data(d, rest) -> flip_left rest (Data(d,r))
+		| [] -> ([], r)
+		| Cursor(c)::rest -> flip_left rest (Cursor(c)::r)
+		| Data(d)::rest -> flip_left rest (Data(d)::r)
 	in
 	let (l', r') = flip_left l r in
 	(l', c, r')
@@ -105,12 +104,12 @@ let zip_to_cursor_no_save (l,c,r) target =
 	(* print_clist r; *)
 	let rec flip_to_cursor in_l out_l target =
 		match in_l with
-		| Nil -> None
-		| Cursor(cur, rest) -> 
+		| [] -> None
+		| Cursor(cur)::rest -> 
 			(* print_string ("(cur: "^cur^" tar: "^target^")"); *)
 			if cur = target then Some(rest, out_l) else
-			flip_to_cursor rest (Cursor(cur, out_l)) target
-		| Data(d, rest) -> flip_to_cursor rest (Data(d, out_l)) target
+			flip_to_cursor rest (Cursor(cur)::out_l) target
+		| Data(d)::rest -> flip_to_cursor rest (Data(d)::out_l) target
 	in
 	if target = c then (l,c,r) else
 	(* search left *)
@@ -124,7 +123,7 @@ let zip_to_cursor_no_save (l,c,r) target =
 
 let zip_to_cursor (l,c,r) target = 
 	if target = c then (l,c,r) else
-	zip_to_cursor_no_save (l,c,(Cursor(c,r))) target
+	zip_to_cursor_no_save (l,c,(Cursor(c)::r)) target
 
 
 let rec do_command c content =
@@ -133,84 +132,84 @@ let rec do_command c content =
 	| Replace(new_item, d) ->
 	(
 		match d, l, r with
-		| L, Nil, _ | R, _, Nil -> content (* failwith "no value to replace" *)
-		| L, Cursor(cur, rest), _ -> do_command c (rest, user_c, Cursor(cur,r))
-		| R, _, Cursor(cur, rest) -> do_command c (Cursor(cur,l), user_c, rest)
-		| L, Data(_, rest), _ -> (Data(new_item, rest), user_c, r)
-		| R, _, Data(_, rest) -> (l, user_c, Data(new_item, rest))
+		| L, [], _ | R, _, [] -> content (* failwith "no value to replace" *)
+		| L, Cursor(cur)::rest, _ -> do_command c (rest, user_c, Cursor(cur)::r)
+		| R, _, Cursor(cur)::rest -> do_command c (Cursor(cur)::l, user_c, rest)
+		| L, Data(_)::rest, _ -> (Data(new_item)::rest, user_c, r)
+		| R, _, Data(_)::rest -> (l, user_c, Data(new_item)::rest)
 	) 
 	| Insert(new_item, d) ->
 	(
 		match d, l, r with
-		| L, Cursor(cur, rest), _ -> do_command c (rest, user_c, Cursor(cur,r))
-		| R, _, Cursor(cur, rest) -> do_command c (Cursor(cur,l), user_c, rest)
-		| L, _, _ -> (Data(new_item, l), user_c, r)
-		| R, _, _ -> (l, user_c, Data(new_item, r))
+		| L, Cursor(cur)::rest, _ -> do_command c (rest, user_c, Cursor(cur)::r)
+		| R, _, Cursor(cur)::rest -> do_command c (Cursor(cur)::l, user_c, rest)
+		| L, _, _ -> (Data(new_item)::l, user_c, r)
+		| R, _, _ -> (l, user_c, Data(new_item)::r)
 	)
 	| Remove(d) ->
 	(
 		match d, l, r with
-		| L, Nil, _ | R, _, Nil -> content (* failwith "no value to remove" *)
-		| L, Cursor(cur, rest), _ -> do_command c (rest, user_c, Cursor(cur,r))
-		| R, _, Cursor(cur, rest) -> do_command c (Cursor(cur,l), user_c, rest)
-		| L, Data(_, rest), _ -> (rest, user_c, r)
-		| R, _, Data(_, rest) -> (l, user_c, rest)
+		| L, [], _ | R, _, [] -> content (* failwith "no value to remove" *)
+		| L, Cursor(cur)::rest, _ -> do_command c (rest, user_c, Cursor(cur)::r)
+		| R, _, Cursor(cur)::rest -> do_command c (Cursor(cur)::l, user_c, rest)
+		| L, Data(_)::rest, _ -> (rest, user_c, r)
+		| R, _, Data(_)::rest -> (l, user_c, rest)
 	)
 	(* TODO: try to collapse the Move command into one case *)
 	| Move(L) ->
 	(
 		match l with
-		| Nil -> (l,user_c,r)
-		| Cursor(cur, rest) -> do_command c (rest, user_c, Cursor(cur,r))
-		| Data(d, rest) -> (rest, user_c, Data(d, r))
+		| [] -> (l,user_c,r)
+		| Cursor(cur)::rest -> do_command c (rest, user_c, Cursor(cur)::r)
+		| Data(d)::rest -> (rest, user_c, Data(d)::r)
 	)
 	| Move(R) -> 
 	(
 		match r with
-		| Nil -> (l,user_c,r)
-		| Cursor(cur, rest) -> do_command c (Cursor(cur,l), user_c, rest)
-		| Data(d, rest) -> (Data(d, l), user_c, rest)
+		| [] -> (l,user_c,r)
+		| Cursor(cur)::rest -> do_command c (Cursor(cur)::l, user_c, rest)
+		| Data(d)::rest -> (Data(d)::l, user_c, rest)
 		
 	)
 	| JumpTo(cur) ->
  		(* Printf.printf "Cursor: %s, JumpTo: %s\n" user_c cur; *)
 		if user_c = cur then content else
 		let (l',c',r') = zip_to_cursor_no_save content cur in
-		(l', user_c, Cursor(c', r'))
+		(l', user_c, Cursor(c')::r')
 	| SwitchTo(cur) -> 
  		(* Printf.printf "Cursor: %s, SwitchTo: %s\n" user_c cur; *)
 		zip_to_cursor content cur
 	| Make(cur) ->
  		(* Printf.printf "Cursor: %s, Make: %s\n" user_c cur; *)
-		(l,user_c,Cursor(cur,r))
+		(l,user_c,Cursor(cur)::r)
 
 let do_action a history =
 	match a with
 	| Command(c) ->
 		let (old_l,user_c,new_l) = history in
-		do_command (Insert(c,L)) (old_l,user_c,Nil)
+		do_command (Insert(c,L)) (old_l,user_c,[])
 	| Undo -> do_command (Move(L)) history
 	| Redo -> do_command (Move(R)) history
 
 let build_content history =
 	let rec build_content content commands = 
 		match commands with
-		| Nil -> content
-		| Cursor(_, rest) ->
+		| [] -> content
+		| Cursor(_)::rest ->
 			build_content content rest
-		| Data(command, rest) ->
+		| Data(command)::rest ->
 			build_content (do_command command content) rest
 	in
 	let (commands, _, _) = history in
-	build_content (Nil, "0", Nil) (rev_clist commands)
+	build_content ([], "0", []) (rev_clist commands)
 
 let print_content content =
 	let (_,_,content) = zip_to_left content in
 	let rec print_content content =
 		match content with
-		| Nil -> print_string "\n"
-		| Cursor(c,rest) -> print_content rest
-		| Data(d,rest) -> 
+		| [] -> print_string "\n"
+		| Cursor(c)::rest -> print_content rest
+		| Data(d)::rest -> 
 			(print_string d; print_content rest)
 	in
 	print_content content
@@ -226,10 +225,10 @@ let do_input history input =
 let break_into_lines clist =
 	let rec loop inp current outp =
 		match inp with
-		| Nil -> current::outp
-		| Cursor(c,rest) -> loop rest ("(" ^ c ^ ")" ^ current) outp
-		| Data('\n',rest) | Data('\r',rest) -> loop rest "" (current::outp)
-		| Data(d,rest) -> loop rest ((String.make 1 d) ^ current) outp
+		| [] -> current::outp
+		| Cursor(c)::rest -> loop rest ("(" ^ c ^ ")" ^ current) outp
+		| Data('\n')::rest | Data('\r')::rest -> loop rest "" (current::outp)
+		| Data(d)::rest -> loop rest ((String.make 1 d) ^ current) outp
 	in
 	loop clist "" []
 
