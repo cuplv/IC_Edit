@@ -9,8 +9,13 @@ TODO: reorganize into modules
 open Graphics
 open Adapton
 
+(*********)
+(* Types *)
+(*********)
+
 (* labeled edit point *)
 type cursor = string
+module Cursor = Types.String
 
 module ArtLib = Insts.Nominal
 type name = Name.t
@@ -24,30 +29,31 @@ struct
     type t = D.t cdata
     let hash seed =
     	function
-    	| Cursor(c) -> Types.String.hash (Hashtbl.seeded_hash seed `Cursor) c
+    	| Cursor(c) -> Cursor.hash (Hashtbl.seeded_hash seed `Cursor) c
     	| Data(d) -> D.hash (Hashtbl.seeded_hash seed `Data) d
     let compare t t' = compare (hash 42 t) (hash 42 t')
     let equal x x' =
     	x == x' ||
     	match x, x' with
-        | Cursor(c), Cursor(c') -> Types.String.equal c c'
+        | Cursor(c), Cursor(c') -> Cursor.equal c c'
         | Data(d), Data(d') -> D.equal d d'
         | _ -> false
     let sanitize x =
     	match x with
-      	| Cursor(c) -> Cursor(Types.String.sanitize c)
+      	| Cursor(c) -> Cursor(Cursor.sanitize c)
       	| Data(d) -> Data(D.sanitize d)
     let show x =
     	match x with
-      	| Cursor(c) -> "Cursor("^Types.String.show c^")"
+      	| Cursor(c) -> "Cursor("^Cursor.show c^")"
       	| Data(d) -> "Data("^(D.show d)^")"
     let pp fmt s = Format.fprintf fmt "%s" (show s)
 end
-module CharCList = SpreadTree.MakeSeq(Insts.Nominal)(Name)(CData(Types.Char))
+module CharCListST = SpreadTree.Make(Insts.Nominal)(Name)(CData(Types.Char))
+module CharCList = SpreadTree.SeqWrap(Insts.Nominal)(Name)(CData(Types.Char))(CharCListST)
 
 (* cursor zipper *)
 type 'a zip = 'a cdata list * cursor * 'a cdata list
-module CharCZip = Types.Tuple3(CharCList)(Types.String)(CharCList)
+module CharCZip = Types.Tuple3(CharCList)(Cursor)(CharCList)
 
 (* directions for cursor manipulation *)
 type dir = L | R
@@ -87,9 +93,9 @@ struct
     	| Insert(e,d) -> Dir.hash (Elm.hash (Hashtbl.seeded_hash seed `Insert) e) d
     	| Remove(d) -> Dir.hash (Hashtbl.seeded_hash seed `Remove) d
     	| Move(d) -> Dir.hash (Hashtbl.seeded_hash seed `Move) d
-    	| JumpTo(c) -> Types.String.hash (Hashtbl.seeded_hash seed `JumpTo) c
-    	| SwitchTo(c) -> Types.String.hash (Hashtbl.seeded_hash seed `SwitchTo) c
-    	| Make(c) -> Types.String.hash (Hashtbl.seeded_hash seed `Make) c
+    	| JumpTo(c) -> Cursor.hash (Hashtbl.seeded_hash seed `JumpTo) c
+    	| SwitchTo(c) -> Cursor.hash (Hashtbl.seeded_hash seed `SwitchTo) c
+    	| Make(c) -> Cursor.hash (Hashtbl.seeded_hash seed `Make) c
     let compare t t' = compare (hash 42 t) (hash 42 t')
     let equal x x' =
     	x == x' ||
@@ -98,9 +104,9 @@ struct
         | Insert(e,d), Insert(e',d') -> Elm.equal e e' && Dir.equal d d'
         | Remove(d), Remove(d') -> Dir.equal d d'
         | Move(d), Move(d') -> Dir.equal d d'
-        | JumpTo(c), JumpTo(c') -> Types.String.equal c c'
-        | SwitchTo(c), SwitchTo(c') -> Types.String.equal c c'
-        | Make(c), Make(c') -> Types.String.equal c c'
+        | JumpTo(c), JumpTo(c') -> Cursor.equal c c'
+        | SwitchTo(c), SwitchTo(c') -> Cursor.equal c c'
+        | Make(c), Make(c') -> Cursor.equal c c'
         | _ -> false
     let sanitize x =
     	match x with
@@ -108,23 +114,23 @@ struct
     	| Insert(e,d) -> Insert(Elm.sanitize e, Dir.sanitize d)
     	| Remove(d) -> Remove(Dir.sanitize d)
     	| Move(d) -> Move(Dir.sanitize d)
-    	| JumpTo(c) -> JumpTo(Types.String.sanitize c)
-    	| SwitchTo(c) -> SwitchTo(Types.String.sanitize c)
-    	| Make(c) -> Make(Types.String.sanitize c)
+    	| JumpTo(c) -> JumpTo(Cursor.sanitize c)
+    	| SwitchTo(c) -> SwitchTo(Cursor.sanitize c)
+    	| Make(c) -> Make(Cursor.sanitize c)
     let show x =
     	match x with
     	| Replace(e,d) -> "Replace("^Elm.show e^", "^Dir.show d^")"
     	| Insert(e,d) -> "Insert("^Elm.show e^", "^Dir.show d^")"
     	| Remove(d) -> "Remove("^Dir.show d^")"
     	| Move(d) -> "Move("^Dir.show d^")"
-    	| JumpTo(c) -> "JumpTo("^Types.String.show c^")"
-    	| SwitchTo(c) -> "SwitchTo("^Types.String.show c^")"
-    	| Make(c) -> "Make("^Types.String.show c^")"
+    	| JumpTo(c) -> "JumpTo("^Cursor.show c^")"
+    	| SwitchTo(c) -> "SwitchTo("^Cursor.show c^")"
+    	| Make(c) -> "Make("^Cursor.show c^")"
     let pp fmt s = Format.fprintf fmt "%s" (show s)
 end
 
 module ComCList = SpreadTree.MakeSeq(Insts.Nominal)(Name)(CData(Command(Types.Char)))
-module HZip = Tuple3(ComCList)(Types.String)(ComCList)
+module HZip = Tuple3(ComCList)(Cursor)(ComCList)
 (* actions for editor *)
 type 'a action = 
 | Command of 'a command
@@ -136,6 +142,100 @@ type 'a action =
 type history = hzip
 type content = czip
  *)
+
+(************************************)
+(* Tree conversion                  *)
+(* Modified from Adapton.SpreadTree *)
+(************************************)
+
+  (* recreate modules shortcuts *)
+  module St = CharCListST
+  module LArt = St.List.Art
+  module Elt = CData(Types.Char)
+
+(* named leaf data *)
+  let rope_of_list_rec : name option -> int -> int -> St.Rope.t -> St.List.t -> St.Rope.t * St.List.t =
+    let module P = Articulated.ArtTuple2(ArtLib)(Name)(St.Rope)(St.List) in
+    let rope_of_list_rec =
+      let mfn = P.Art.mk_mfn (Name.of_string "rope_of_list_rec")
+        (module Types.Tuple5(Types.Option(Name))(Types.Int)(Types.Int)(St.Rope)(St.List))
+
+        (fun r (nm_opt, parent_lev, rope_lev, rope, list) ->
+          let rope_of_list_rec no pl tl t l = r.P.Art.mfn_data (no,pl,tl,t,l) in
+          ( match list with
+          | `Nil -> rope, `Nil
+          | `Cons (hd, tl) ->
+            let hd_lev = ffs (Elt.hash 0 hd) in
+            if rope_lev <= hd_lev && hd_lev <= parent_lev then (
+              match nm_opt with
+              | None -> failwith "poor name/cons ordering"
+              (*
+                let right, rest = rope_of_list_rec None hd_lev (-1) (`One hd) tl in
+                let rope = `Two(rope, right) in
+                rope_of_list_rec None parent_lev hd_lev rope rest
+              *)
+              | Some(nm0) ->
+                let nm1,nm  = Name.fork nm0 in
+                let nm2,nm3 = Name.fork nm in
+                let right, rest = P.split nm1 (r.P.Art.mfn_nart nm2 (None, hd_lev, (-1), (`Name(nm0, `One hd)), tl)) in
+                let rope : St.Rope.t = `Two(rope, `Name(nm3, `Art(right))) in
+                rope_of_list_rec None parent_lev hd_lev rope (LArt.force rest)
+            )
+            else (
+              match nm_opt with
+              | None -> failwith "poor name/cons ordering"
+              | Some(nm) -> rope, `Name(nm, list)
+            )
+          | `Art art -> rope_of_list_rec nm_opt parent_lev rope_lev rope (LArt.force art)
+          | `Name(nm, list) -> rope_of_list_rec (Some nm) parent_lev rope_lev rope list
+          )
+        )
+      in
+      fun nm pl tl t l -> mfn.P.Art.mfn_data (nm, pl, tl, t, l)
+    in
+    rope_of_list_rec
+
+  let rope_of_list : St.List.t -> St.Rope.t =
+      let rope, rest =
+        rope_of_list_rec cursor None max_int (-1) (`Zero) list
+      in
+      (* assert (list_is_empty rest) ; *)
+      rope
+
+(* Use name associated with data, but no others *)
+  let list_of_rope : Cursor.t -> St.Rope.t -> St.List.t -> St.List.t =
+  	fun cursor ->
+  	let cell =
+  	  let memocell = 
+        LArt.mk_mfn
+          (Name.of_string "elm_of_cursor")
+          (module St.List)
+          (fun r list -> list)
+      in
+      fun nm list -> (memocell.LArt.mfn_nart (Name.pair cursor nm) list)
+    in
+    let mfn = LArt.mk_mfn (Name.of_string "list_of_rope")
+      (module Types.Tuple3(Types.Option(Name))(St.Rope)(St.List))
+      (fun r (nm_opt, rope, rest) ->
+        let list_of_rope nm_opt rope list = r.LArt.mfn_data (nm_opt, rope, list) in
+        ( match rope with
+        | `Zero          -> rest
+        | `One x         -> failwith "poor name/one ordering"
+        | `Two(x,y)      -> list_of_rope x (list_of_rope y rest)
+        | `Art art       -> list_of_rope (RArt.force art) rest
+        (* maintain association of special name *)
+        | `Name(nm, `One x) -> `Name(nm, `Art(cell nm (`Cons(x, rest))))
+        (* memoize a recursive call, but don't add memo points to the list *)
+        (* ie, consume all extra tree names *)
+        | `Name(nm,rope) -> LArt.force (r.LArt.mfn_nart nm (rope, rest))
+        )
+      )
+    in
+    fun rope list -> mfn.LArt.mfn_data (None, rope, list)
+
+(*************************)
+(* Editing functionality *)
+(*************************)
 
 let print_clist cl =
 	CharCList.simple_full_string cl
@@ -165,9 +265,9 @@ let zip_to_left (l,c,r) =
 	('Nil, c, r)
 
 (* incrementalize *)
+let zip_to_cursor_no_save : CharCList.t -> Cursor.t -> CharCList.t =
+(* 
 let zip_to_cursor_no_save (l,c,r) target =
-	(* print_clist l; *)
-	(* print_clist r; *)
 	let rec flip_to_cursor in_l out_l target =
 		match in_l with
 		| [] -> None
@@ -186,7 +286,7 @@ let zip_to_cursor_no_save (l,c,r) target =
 	match flip_to_cursor r l target with
 	| Some(r', l') -> (l', target, r')
 	| None -> failwith ("cursor not found: " ^ target)
-
+ *)
 let zip_to_cursor (l,c,r) target = 
 	if target = c then (l,c,r) else
 	zip_to_cursor_no_save (l,c,(Cursor(c)::r)) target
@@ -364,10 +464,6 @@ let rec repl dir mode history =
 		|> do_action (Command(Move(dir)))
 		|> loop
 
-let user_repl () =
-	open_graph ":0.0 800x600+0-0";
-	repl R false (blank_editor None)
-
 let time thunk =
 	let start = Unix.gettimeofday () in
 	let res = thunk() in
@@ -415,6 +511,14 @@ let random_commands num =
 	in
 	let (_,ret) = loop num (1, blank_editor None) in
 	ret
+
+let user_repl () =
+	open_graph ":0.0 800x600+0-0";
+	repl R false (blank_editor None)
+
+(****************)
+(* Entry points *)
+(****************)
 
 let _ = user_repl()
 
