@@ -227,32 +227,40 @@ let do_input history input =
 	do_input history input
 
 let break_into_lines clist =
-	let rec loop inp current outp =
+	let rec loop count inp current outp =
+		if count = 20 then outp else
 		match inp with
 		| [] -> current::outp
-		| Cursor(c)::rest -> loop rest ("(" ^ c ^ ")" ^ current) outp
-		| Data('\n')::rest | Data('\r')::rest -> loop rest "" (current::outp)
-		| Data(d)::rest -> loop rest ((String.make 1 d) ^ current) outp
+		| Cursor(c)::rest -> loop count rest ("(" ^ c ^ ")" ^ current) outp
+		| Data('\n')::rest | Data('\r')::rest -> loop (count + 1) rest "" (current::outp)
+		| Data(d)::rest -> loop count rest ((String.make 1 d) ^ current) outp
 	in
-	loop clist "" []
+	loop 0 clist "" []
+
+let break_into_lines_r clist =
+	let rec loop count inp current outp =
+		if count = 21 then outp else
+		match inp with
+		| [] -> current::outp
+		| Cursor(c)::rest -> loop count rest (current ^ "(" ^ c ^ ")") outp
+		| Data('\n')::rest | Data('\r')::rest -> loop (count + 1) rest "" (current::outp)
+		| Data(d)::rest -> loop count rest (current ^ (String.make 1 d)) outp
+	in
+	loop 0 clist "" []
 
 let draw_cursor () =
 	rmoveto 2 (-2);
 	rlineto 0 17;
 	rmoveto 2 (-15)
 
-let draw_string_list l =
-	let rec draw count l =
-		if count > 20 then () else
-		match l with
-		| [] -> ()
-		| h::[] -> draw_string h
-		| h::t ->
-		draw_string h;
-		moveto 2 ((current_y()) - 15);
-		draw (count + 1) t
-	in
-	draw 0 l
+let rec draw_string_list l =
+	match l with
+	| [] -> ()
+	| h::[] -> draw_string h
+	| h::t ->
+	draw_string h;
+	moveto 2 ((current_y()) - 15);
+	draw_string_list t
 
 let print_string_list l =
 	let rec print count l =
@@ -268,10 +276,9 @@ let print_string_list l =
 
 let lines_of_content content =
 	let (l,_,r) = content in
-	let r = rev_clist r in
-	let r_lines = break_into_lines r in
 	let l_lines = break_into_lines l in
-	(l_lines, r_lines)
+	let r_lines = break_into_lines_r r in
+	(l_lines, List.rev r_lines)
 	
 let saved_actions = ref []
 let save act_string = 
@@ -394,7 +401,7 @@ let random_commands num =
 
 let user_repl () =
 	open_graph ":0.0 800x600+0-0";
-	repl R false (random_commands 100)(* (blank_editor None) *)
+	repl R false (random_commands 100000)(* (blank_editor None) *)
 
 let _ = user_repl()
 
