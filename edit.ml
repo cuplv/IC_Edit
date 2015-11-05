@@ -130,13 +130,17 @@ let rec do_command c content =
 	let (l, user_c, r) = content in
 	match c with
 	| Replace(new_item, d) ->
+	(* modified to be Overwrite *)
 	(
 		match d, l, r with
-		| L, [], _ | R, _, [] -> content (* failwith "no value to replace" *)
+		(* do an insert at the end of the text *)
+		| L, [], _ -> (l, user_c, Data(new_item)::r)
+		| R, _, [] -> (Data(new_item)::l, user_c, r)
+
 		| L, Cursor(cur)::rest, _ -> do_command c (rest, user_c, Cursor(cur)::r)
 		| R, _, Cursor(cur)::rest -> do_command c (Cursor(cur)::l, user_c, rest)
-		| L, Data(_)::rest, _ -> (Data(new_item)::rest, user_c, r)
-		| R, _, Data(_)::rest -> (l, user_c, Data(new_item)::rest)
+		| L, Data(_)::rest, _ -> (rest, user_c, Data(new_item)::r)
+		| R, _, Data(_)::rest -> (Data(new_item)::l, user_c, rest)
 	) 
 	| Insert(new_item, d) ->
 	(
@@ -269,6 +273,22 @@ let lines_of_content content =
 	let l_lines = break_into_lines l in
 	(l_lines, r_lines)
 	
+let saved_actions = ref []
+let save act_string = 
+	saved_actions := act_string::!saved_actions
+
+let draw_saved_actions() =
+	let rec draw_act c l =
+		if c > 40 then () else
+		match l with
+		| [] -> ()
+		| a::t -> 
+			draw_string a;
+			moveto 600 ((current_y()) + 15);
+			draw_act (c+1) t
+	in
+	draw_act 0 !saved_actions
+
 let rec repl dir mode history =
 	let loop = repl dir mode in 
 	(* draw history to screen *)
@@ -281,44 +301,48 @@ let rec repl dir mode history =
 	draw_string_list l_lines;
 	draw_cursor();
 	draw_string_list r_lines;
+	moveto 600 2;
+	draw_saved_actions();
 	(* act on keypress *)
 	match int_of_char(read_key()) with
 	|(* esc *) 27 -> () 
-	|(* ctrl-z *) 26 -> history |> do_action Undo |> loop
-	|(* ctrl-y *) 25 -> history |> do_action Redo |> loop
+	|(* ctrl-z *) 26 -> save "Undo"; history |> do_action Undo |> loop
+	|(* ctrl-y *) 25 -> save "Redo"; history |> do_action Redo |> loop
 	|(* ctrl-x switch *) 24 -> 
 		let c = read_key() in
-		history |> do_action (Command(SwitchTo(String.make 1 c))) |> loop
+		let c = String.make 1 c in
+		save ("Switch to ("^c^")");
+		history |> do_action (Command(SwitchTo(c))) |> loop
 	|(* ctrl-c jump *) 3 ->
 		let c = read_key() in
-		history |> do_action (Command(JumpTo(String.make 1 c))) |> loop
+		let c = String.make 1 c in
+		save ("Jump to ("^c^")");
+		history |> do_action (Command(JumpTo(c))) |> loop
 	|(* ctrl-v create *) 22 -> 
 		let c = read_key() in
-		history |> do_action (Command(Make(String.make 1 c))) |> loop
-	|(* delete *) 8 -> history |> do_action (Command(Remove(other_dir dir))) |> loop
-	|(* TODO: Move Up *) 9 -> history |> loop
-	|(* Move Left *) 10 -> history |> do_action (Command(Move(L))) |> loop
-	|(* TODO: Move Down *) 11 -> history |> loop
-	|(* Move Right *) 12 -> history |> do_action (Command(Move(R))) |> loop
-	|(* ctrl-o overwrite mode *) 15 -> history |> repl dir (not mode)
-	|(* ctrl-u direction mode *) 21 -> history |> repl (other_dir dir) mode
-	| ascii -> 
+		let c = String.make 1 c in
+		save ("Create ("^c^")");
+		history |> do_action (Command(Make(c))) |> loop
+	|(* delete *) 8 -> save "Backspace"; history |> do_action (Command(Remove(other_dir dir))) |> loop
+	|(* TODO: Move Up *) 9 -> save "Cursor up (unimplemented)"; history |> loop
+	|(* Move Left *) 10 -> save "Cursor left"; history |> do_action (Command(Move(L))) |> loop
+	|(* TODO: Move Down *) 11 -> save "Cursor down (unimplemented)"; history |> loop
+	|(* Move Right *) 12 -> save "Cursor right"; history |> do_action (Command(Move(R))) |> loop
+	|(* ctrl-o overwrite mode *) 15 -> save "Switch overwrite mode"; history |> repl dir (not mode)
+	|(* ctrl-u direction mode *) 21 -> save "Switch direction mode"; history |> repl (other_dir dir) mode
+	| ascii ->
 	let k = char_of_int ascii in
 	match mode with
-	| true -> 
+	| true ->
+		if ascii = 13 then save "Replace with Return" else save ("Replace with "^(String.make 1 k));
 		history
 		|> do_action (Command(Replace(k, dir)))
-		|> do_action (Command(Move(dir)))
 	    |> loop
-	| false -> 
+	| false ->
+		if ascii = 13 then save "Insert Return" else save ("Insert "^(String.make 1 k));
 		history 
-		|> do_action (Command(Insert(k,dir)))
-		|> do_action (Command(Move(dir)))
+		|> do_action (Command(Insert(k,(other_dir dir))))
 		|> loop
-
-let user_repl () =
-	open_graph ":0.0 800x600+0-0";
-	repl R false (blank_editor None)
 
 let time thunk =
 	let start = Unix.gettimeofday () in
@@ -367,6 +391,10 @@ let random_commands num =
 	in
 	let (_,ret) = loop num (1, blank_editor None) in
 	ret
+
+let user_repl () =
+	open_graph ":0.0 800x600+0-0";
+	repl R false (random_commands 100)(* (blank_editor None) *)
 
 let _ = user_repl()
 

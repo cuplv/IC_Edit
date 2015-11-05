@@ -153,8 +153,10 @@ type content = czip
   module LArt = St.List.Art
   module Elt = CData(Types.Char)
 
-(* named leaf data *)
-  let rope_of_list_rec : name option -> int -> int -> St.Rope.t -> St.List.t -> St.Rope.t * St.List.t =
+(* mod: named leaf data *)
+  let rope_of_list_rec : Cursor.t -> name option -> int -> int -> St.Rope.t -> St.List.t -> St.Rope.t * St.List.t =
+    fun cursor ->
+    let c nm = Name.pair cursor nm in
     let module P = Articulated.ArtTuple2(ArtLib)(Name)(St.Rope)(St.List) in
     let rope_of_list_rec =
       let mfn = P.Art.mk_mfn (Name.of_string "rope_of_list_rec")
@@ -175,7 +177,8 @@ type content = czip
                 rope_of_list_rec None parent_lev hd_lev rope rest
               *)
               | Some(nm0) ->
-                let nm1,nm  = Name.fork nm0 in
+              	(* use the form of the name from the current cursor to fill the tree with arts *)
+                let nm1,nm  = Name.fork (c nm0) in
                 let nm2,nm3 = Name.fork nm in
                 let right, rest = P.split nm1 (r.P.Art.mfn_nart nm2 (None, hd_lev, (-1), (`Name(nm0, `One hd)), tl)) in
                 let rope : St.Rope.t = `Two(rope, `Name(nm3, `Art(right))) in
@@ -202,7 +205,7 @@ type content = czip
       (* assert (list_is_empty rest) ; *)
       rope
 
-(* Use name associated with data, but no others *)
+(* mod: Use name associated with data, but no others *)
   let list_of_rope : Cursor.t -> St.Rope.t -> St.List.t -> St.List.t =
   	fun cursor ->
   	let cell =
@@ -266,6 +269,15 @@ let zip_to_left (l,c,r) =
 
 (* incrementalize *)
 let zip_to_cursor_no_save : CharCList.t -> Cursor.t -> CharCList.t =
+	let find target tree =
+		
+	fun (l,c,r) target ->
+	let lzip = rope_of_list l in
+	let rzip = rope_of_list r in
+	find target `Two(lzip,rzip)
+
+
+
 (* 
 let zip_to_cursor_no_save (l,c,r) target =
 	let rec flip_to_cursor in_l out_l target =
