@@ -1,5 +1,4 @@
 (*
-TODO: deal with insert keypress semantics, currently doing two commands
 TODO: reorganize into modules
 
 *)
@@ -10,6 +9,12 @@ open Graphics
 open Adapton
 module Seq = SpreadTree.MakeSeq(Insts.Nominal)(Name)(Types.Int)
 *)
+
+
+
+(*********)
+(* Types *)
+(*********)
 
 (* labeled edit point *)
 type cursor = string
@@ -47,20 +52,17 @@ type 'a action =
 type 'a history = 'a command zip
 type 'a content = 'a zip
 
-let print_clist cl =
-	let rec p cl =
-		match cl with
-		| [] -> print_string "]"
-		| Cursor(c)::r -> 
-			print_string ("Cursor(" ^ c ^ "); ");
-			p r
-		| Data(d)::r ->
-			print_string ("Data; ");
-			p r
-	in
-	print_string "[";
-	p cl;
-	print_string "\n"
+
+(***********)
+(* Helpers *)
+(***********)
+
+let time thunk =
+	let start = Unix.gettimeofday () in
+	let res = thunk() in
+    let stop = Unix.gettimeofday () in
+    let t = (stop -. start) in
+    (t,res)
 
 let other_dir dir =
 	match dir with
@@ -98,10 +100,11 @@ let zip_to_left (l,c,r) =
 	let (l', r') = flip_left l r in
 	(l', c, r')
 
+(**********)
+(* Search *)
+(**********)
 
 let zip_to_cursor_no_save (l,c,r) target =
-	(* print_clist l; *)
-	(* print_clist r; *)
 	let rec flip_to_cursor in_l out_l target =
 		match in_l with
 		| [] -> None
@@ -125,6 +128,9 @@ let zip_to_cursor (l,c,r) target =
 	if target = c then (l,c,r) else
 	zip_to_cursor_no_save (l,c,(Cursor(c)::r)) target
 
+(******************)
+(* Create Content *)
+(******************)
 
 let rec do_command c content =
 	let (l, user_c, r) = content in
@@ -207,24 +213,9 @@ let build_content history =
 	let (commands, _, _) = history in
 	build_content ([], "0", []) (rev_clist commands)
 
-let print_content content =
-	let (_,_,content) = zip_to_left content in
-	let rec print_content content =
-		match content with
-		| [] -> print_string "\n"
-		| Cursor(c)::rest -> print_content rest
-		| Data(d)::rest -> 
-			(print_string d; print_content rest)
-	in
-	print_content content
-
-let do_input history input =
-	let rec do_input history input =
-		match input with
-		| [] -> history
-		| a::rest -> do_input (do_action a history) rest
-	in
-	do_input history input
+(***************)
+(* Draw screen *)
+(***************)
 
 let break_into_lines clist =
 	let rec loop count inp current outp =
@@ -284,79 +275,25 @@ let saved_actions = ref []
 let save act_string = 
 	saved_actions := act_string::!saved_actions
 
-let draw_saved_actions() =
-	let rec draw_act c l =
-		if c > 40 then () else
+let draw_saved_actions () =
+	let rec draw_act c n l =
+		if c > 35 then () else
 		match l with
 		| [] -> ()
 		| a::t -> 
+			draw_string (string_of_int n);
+			draw_string ". ";
 			draw_string a;
 			moveto 600 ((current_y()) + 15);
-			draw_act (c+1) t
+			draw_act (c + 1) (n - 1) t
 	in
-	draw_act 0 !saved_actions
+	set_color (rgb 20 20 220);
+	let num = List.length !saved_actions in
+	draw_act 0 num !saved_actions
 
-let rec repl dir mode history =
-	let loop = repl dir mode in 
-	(* draw history to screen *)
-	let (l_lines,r_lines) = 
-		history
-		|> build_content
-		|> lines_of_content
-	in
-	clear_graph();moveto 2 585;
-	draw_string_list l_lines;
-	draw_cursor();
-	draw_string_list r_lines;
-	moveto 600 2;
-	draw_saved_actions();
-	(* act on keypress *)
-	match int_of_char(read_key()) with
-	|(* esc *) 27 -> () 
-	|(* ctrl-z *) 26 -> save "Undo"; history |> do_action Undo |> loop
-	|(* ctrl-y *) 25 -> save "Redo"; history |> do_action Redo |> loop
-	|(* ctrl-x switch *) 24 -> 
-		let c = read_key() in
-		let c = String.make 1 c in
-		save ("Switch to ("^c^")");
-		history |> do_action (Command(SwitchTo(c))) |> loop
-	|(* ctrl-c jump *) 3 ->
-		let c = read_key() in
-		let c = String.make 1 c in
-		save ("Jump to ("^c^")");
-		history |> do_action (Command(JumpTo(c))) |> loop
-	|(* ctrl-v create *) 22 -> 
-		let c = read_key() in
-		let c = String.make 1 c in
-		save ("Create ("^c^")");
-		history |> do_action (Command(Make(c))) |> loop
-	|(* delete *) 8 -> save "Backspace"; history |> do_action (Command(Remove(other_dir dir))) |> loop
-	|(* TODO: Move Up *) 9 -> save "Cursor up (unimplemented)"; history |> loop
-	|(* Move Left *) 10 -> save "Cursor left"; history |> do_action (Command(Move(L))) |> loop
-	|(* TODO: Move Down *) 11 -> save "Cursor down (unimplemented)"; history |> loop
-	|(* Move Right *) 12 -> save "Cursor right"; history |> do_action (Command(Move(R))) |> loop
-	|(* ctrl-o overwrite mode *) 15 -> save "Switch overwrite mode"; history |> repl dir (not mode)
-	|(* ctrl-u direction mode *) 21 -> save "Switch direction mode"; history |> repl (other_dir dir) mode
-	| ascii ->
-	let k = char_of_int ascii in
-	match mode with
-	| true ->
-		if ascii = 13 then save "Replace with Return" else save ("Replace with "^(String.make 1 k));
-		history
-		|> do_action (Command(Replace(k, dir)))
-	    |> loop
-	| false ->
-		if ascii = 13 then save "Insert Return" else save ("Insert "^(String.make 1 k));
-		history 
-		|> do_action (Command(Insert(k,(other_dir dir))))
-		|> loop
-
-let time thunk =
-	let start = Unix.gettimeofday () in
-	let res = thunk() in
-    let stop = Unix.gettimeofday () in
-    let t = (stop -. start) in
-    (t,res)
+(****************)
+(* Auto-content *)
+(****************)
 
 let random_commands num =
 	let add_rnd_act cursor_count history =
@@ -399,11 +336,81 @@ let random_commands num =
 	let (_,ret) = loop num (1, blank_editor None) in
 	ret
 
+(**************************)
+(* Accept user keystrokes *)
+(**************************)
+
+let rec repl dir mode history =
+	let loop = repl dir mode in 
+	(* draw history to screen *)
+	let (clock,_) = time (fun () ->
+		let (l_lines,r_lines) = 
+			history
+			|> build_content
+			|> lines_of_content
+		in
+		clear_graph();
+		moveto 2 585;
+		set_color foreground;
+		draw_string_list l_lines;
+		draw_cursor();
+		draw_string_list r_lines;
+		moveto 600 2;
+		draw_saved_actions()
+	) in
+	moveto 600 585; set_color red;
+	draw_string (Printf.sprintf "Update time: %.4f s" clock);
+	(* act on keypress *)
+	match int_of_char(read_key()) with
+	|(* esc *) 27 -> () 
+	|(* ctrl-z *) 26 -> save "Undo"; history |> do_action Undo |> loop
+	|(* ctrl-y *) 25 -> save "Redo"; history |> do_action Redo |> loop
+	|(* ctrl-x switch *) 24 -> 
+		let c = read_key() in
+		let c = String.make 1 c in
+		save ("Switch to ("^c^")");
+		history |> do_action (Command(SwitchTo(c))) |> loop
+	|(* ctrl-c jump *) 3 ->
+		let c = read_key() in
+		let c = String.make 1 c in
+		save ("Jump to ("^c^")");
+		history |> do_action (Command(JumpTo(c))) |> loop
+	|(* ctrl-v create *) 22 -> 
+		let c = read_key() in
+		let c = String.make 1 c in
+		save ("Create ("^c^")");
+		history |> do_action (Command(Make(c))) |> loop
+	|(* delete *) 8 -> save "Backspace"; history |> do_action (Command(Remove(other_dir dir))) |> loop
+	|(* TODO: Move Up *) 9 -> save "Cursor up (unimplemented)"; history |> loop
+	|(* Move Left *) 10 -> save "Cursor left"; history |> do_action (Command(Move(L))) |> loop
+	|(* TODO: Move Down *) 11 -> save "Cursor down (unimplemented)"; history |> loop
+	|(* Move Right *) 12 -> save "Cursor right"; history |> do_action (Command(Move(R))) |> loop
+	|(* ctrl-o overwrite mode *) 15 -> save "Switch overwrite mode"; history |> repl dir (not mode)
+	|(* ctrl-u direction mode *) 21 -> save "Switch direction mode"; history |> repl (other_dir dir) mode
+	| ascii ->
+	let k = char_of_int ascii in
+	match mode with
+	| true ->
+		if ascii = 13 then save "Replace with Return" else save ("Replace with "^(String.make 1 k));
+		history
+		|> do_action (Command(Replace(k, dir)))
+	    |> loop
+	| false ->
+		if ascii = 13 then save "Insert Return" else save ("Insert "^(String.make 1 k));
+		history 
+		|> do_action (Command(Insert(k,(other_dir dir))))
+		|> loop
+
 let user_repl () =
 	open_graph ":0.0 800x600+0-0";
-	repl R false (random_commands 100000)(* (blank_editor None) *)
+	repl R false (random_commands 75000)(* (blank_editor None) *)
 
 let _ = user_repl()
+
+
+(**********)
+(* Timing *)
+(**********)
 
 (* 
 let default_filename = "result_data.csv"
