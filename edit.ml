@@ -391,19 +391,27 @@ let rec repl dir mode history =
 	let k = char_of_int ascii in
 	match mode with
 	| true ->
-		if ascii = 13 then save "Replace with Return" else save ("Replace with "^(String.make 1 k));
+		begin match ascii with 
+		| 13 -> save "Replace with Return"
+		| 32 -> save "Replace with Space" 
+		| _ -> save ("Replace with "^(String.make 1 k))
+		end;
 		history
 		|> do_action (Command(Replace(k, dir)))
 	    |> loop
 	| false ->
-		if ascii = 13 then save "Insert Return" else save ("Insert "^(String.make 1 k));
+		begin match ascii with 
+		| 13 -> save "Insert Return"
+		| 32 -> save "Insert Space" 
+		| _ -> save ("Insert "^(String.make 1 k))
+		end;
 		history 
 		|> do_action (Command(Insert(k,(other_dir dir))))
 		|> loop
 
 let user_repl () =
 	open_graph ":0.0 800x600+0-0";
-	repl R false (random_commands 75000)(* (blank_editor None) *)
+	repl R false (random_commands 0000)(* (blank_editor None) *)
 
 let _ = user_repl()
 
@@ -440,5 +448,5 @@ let _ =
 			(n * base_number_of_generated_commands)
 			t0 t1 t2 t3
 	done
-
- *)
+*)
+ 
