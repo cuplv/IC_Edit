@@ -1,0 +1,4 @@
+Dependencies
+------------
+brew install freetype
+brew install sdl2
