@@ -26,6 +26,15 @@ enum Dir {
   R,
 }
 
+impl Dir {
+  fn opp(&self) -> Dir {
+    match *self {
+      Dir::L => {Dir::R}
+      Dir::R => {Dir::L}
+    }
+  }
+}
+
 #[derive(Debug, Clone)]
 enum Symbol {
 	Cur(Cursor),
@@ -41,14 +50,30 @@ enum Action {
 
 #[derive(Debug, Clone)]
 enum Command {
-  Ins(String, Dir),
-  Rem(Dir),
-  Move(Dir),
-  Repl(String, Dir),
+  Ins(String, Dir),   //Insert <String>, moving cursor <Dir>
+  Rem(Dir),           //Remove character located <Dir>
+  Move(Dir),          //Move cursor <Dir>
+  Ovr(String, Dir),   //Overwrite with <String>, moving cursor <Dir>
   Mk(Cursor),
   Switch(Cursor),
   Jmp(Cursor),
   Join(Cursor),
+}
+
+#[derive(Debug, Clone)]
+enum CCs {
+  Mk, Switch, Jmp, Join
+}
+
+enum Inputstatus {
+  Insert(Dir),
+  Overwrite(Dir),
+  EnterCursor(
+    Box<Inputstatus>,    // prior input status
+    CCs,            // current command in process
+    List<Action>,   // actions generating new cursor
+    String,         // new cursor in progress
+  )
 }
 
 type Zip<T> = (List<T>,List<T>);
@@ -99,13 +124,21 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
   for command in commands.iter() {
     let (before2, after2) =
     match *command {
-      Command::Ins(ref d, Dir::L) => {
+      Command::Ins(ref d, Dir::R) => {
         (before.append(Symbol::Data(d.clone())),
           after)
+      }
+      Command::Ins(ref d, Dir::L) => {
+        (before,
+          after.append(Symbol::Data(d.clone())))
       }
       Command::Rem(Dir::L) => {
         (before.tail(),
           after)
+      }
+      Command::Rem(Dir::R) => {
+        (before,
+          after.tail())
       }
       Command::Move(Dir::L) => {
         match before.head() {
@@ -125,16 +158,19 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
           }
         }
       }
-      Command::Repl(ref d, Dir::L) => {
-        (before.tail().append(Symbol::Data(d.clone())),
+      Command::Ovr(ref d, Dir::L) => {
+        (before.tail(),
+          after.append(Symbol::Data(d.clone())))
+      }
+      Command::Ovr(ref d, Dir::R) => {
+        (before.append(Symbol::Data(d.clone())),
+          after.tail())
+      }
+      Command::Mk(ref c) => {
+        (before.append(Symbol::Cur(c.clone())),
           after)
       }
-      Command::Repl(ref d, Dir::R) => {
-        (before,
-          after.tail().append(Symbol::Data(d.clone())))
-      }
       _ => {println!("Unsupported opperation");(before,after)}
-      // Mk(Cursor),
       // Switch(Cursor),
       // Jmp(Cursor),
       // Join(Cursor),
@@ -147,32 +183,38 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
   (before, "0".to_string(), after)
 }
 
-fn makelines(before: &List<Symbol>, after: &List<Symbol>) -> List<String> {
+fn makelines(before: &List<Symbol>, after: &List<Symbol>, addcursor: bool) -> List<String> {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
 
   for s in after.iter() {
     match *s {
-      Symbol::Cur(_) => {}
+      Symbol::Cur(ref c) => {
+        partial = partial + "<" + &c + ">"
+      }
       Symbol::Data(ref d) => {
         if d == "\n" {
           out = out.append(partial);
           partial = "".to_string();
-        } else {partial = partial + &d}}
+        } else {partial = partial + &d}
+      }
     }
   }
   out = out.append(partial).rev();
 
   //concat the two sides with cursor
+  let cur = if addcursor {"|"} else {""};
   match out.head(){
-    None => {partial = "|".to_string();}
-    Some(t) => {partial = "|".to_string() + t;}
-  };
+    None => {partial = cur.to_string();}
+    Some(t) => {partial = cur.to_string() + t;}
+  }
   out = out.tail();
 
   for s in before.iter() {
     match *s {
-      Symbol::Cur(_) => {}
+      Symbol::Cur(ref c) => {
+        partial = "<".to_string() + &c + ">" + &partial
+      }
       Symbol::Data(ref d) => {
         if d == "\n" {
           out = out.append(partial);
@@ -186,10 +228,10 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>) -> List<String> {
   out
 }
 
-fn build_content(keys: &List<Action>) -> List<String> {
+fn build_content(keys: &List<Action>, addcursor: bool) -> List<String> {
   let (commands, _) = al_to_ub(&keys.rev());
   let (before, _, after) = cl_to_cz(&commands.rev());
-  makelines(&before, &after)
+  makelines(&before, &after, addcursor)
 }
 
 fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>) {
@@ -213,6 +255,35 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   }
 }
 
+fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, cc:CCs, t: &String) {
+  graphics::clear([0.0, 0.0, 0.0, 1.0], g);
+
+  //println!("{:?}", &t);
+  let size = 48.0;
+  let mut text = graphics::Text::new(48);
+  text.color = [1.0, 1.0, 1.0, 1.0];
+  let (px,py) = (200.0,250.0);
+  let prompt = match cc {
+    CCs::Mk => {"Create cursor: "}
+    CCs::Switch => {"Switch to cursor: "}
+    CCs::Jmp => {"Jump to cursor: "}
+    CCs::Join => {"Join with cursot: "}
+  }.to_string();
+
+  text.draw(
+    &prompt,
+    f,
+    &c.draw_state,
+    c.trans(px, py).transform,
+    g); 
+  text.draw(
+    t,
+    f,
+    &c.draw_state,
+    c.trans(px + size, py + size*1.5).transform,
+    g); 
+}
+
 // Returns a result containing a GlutinWindow or an error if the window
 // settings are not supported
 fn try_create_window() -> Result<GlutinWindow, String> {
@@ -231,6 +302,7 @@ fn main() {
 
   let mut needs_update = true;
   let mut command_key_down = false;
+  let mut status = Inputstatus::Insert(Dir::R);
   let mut inputs = List::new();
   let mut content_text = List::new().append("".to_string());
 
@@ -239,7 +311,24 @@ fn main() {
       //gives typed char or empty
       Event::Input(Input::Text(t)) => {
         if t == "" || command_key_down {continue}
-        inputs = inputs.append(Action::Cmd(Command::Ins(t,Dir::L)));
+        status = match status {
+          Inputstatus::Insert(d) => {
+            inputs = inputs.append(Action::Cmd(Command::Ins(t,d.clone())));
+            Inputstatus::Insert(d)
+          }
+          Inputstatus::Overwrite(d) => {
+            inputs = inputs.append(Action::Cmd(Command::Ovr(t,d.clone())));
+            Inputstatus::Overwrite(d)
+          }
+          Inputstatus::EnterCursor(p,c,a,_) => {
+            let a2 = a.append(Action::Cmd(Command::Ins(t,Dir::R)));
+            let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+            Inputstatus::EnterCursor(
+              p,c,a2,
+              content
+            )
+          }
+        };
         needs_update = true;
       }
       Event::Input(Input::Release(Button::Keyboard(key))) => {
@@ -257,6 +346,7 @@ fn main() {
       }
       Event::Input(Input::Press(Button::Keyboard(key))) => {
         match key {
+          //command keys
           //mac's command key registers as unknown on my machine
           Key::Unknown |
           Key::LCtrl |
@@ -265,57 +355,266 @@ fn main() {
           Key::RAlt => {
             command_key_down = true;
           }
-          Key::Up |
+
+          //unimplemented keys
+          Key::H | //Switch
+          Key::J | //Jmp
+          Key::N => //Join
+          {
+            if command_key_down {
+              println!("C: {:?}", key);
+            } else {continue};
+          }
+          Key::Up => {
+            if command_key_down {
+              println!("Mode: Overwrite");
+              status = match status {
+                Inputstatus::Insert(d) | Inputstatus::Overwrite(d) => {
+                  Inputstatus::Overwrite(d)
+                }
+                Inputstatus::EnterCursor(p,c,a,ct) => {
+                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                }
+              };
+            } else {
+              println!("{:?}", key)
+            }
+          }
           Key::Down => {
-            let m = if command_key_down {"C: "} else {""};
-            println!("{}{:?}", m, key);
+            if command_key_down {
+              println!("Mode: Insert");
+              status = match status {
+                Inputstatus::Insert(d) | Inputstatus::Overwrite(d) => {
+                  Inputstatus::Insert(d)
+                }
+                Inputstatus::EnterCursor(p,c,a,ct) => {
+                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                }
+              };
+            } else {
+              println!("{:?}", key)
+            }
           }
           Key::Left => {
-            if command_key_down {println!("C: Left");}
+            if command_key_down {
+              println!("Mode: Left");
+              status = match status {
+                Inputstatus::Insert(_) => {
+                  Inputstatus::Insert(Dir::L)
+                }
+                Inputstatus::Overwrite(_) => {
+                  Inputstatus::Overwrite(Dir::L)
+                }
+                Inputstatus::EnterCursor(p,c,a,ct) => {
+                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                }
+              };
+            }
             else{
-              inputs = inputs.append(
-                Action::Cmd(Command::Move(Dir::L))
-              );
+              status = match status {
+                Inputstatus::Insert(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Move(Dir::L))
+                  );
+                  Inputstatus::Insert(d)
+                }
+                Inputstatus::Overwrite(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Move(Dir::L))
+                  );
+                  Inputstatus::Overwrite(d)
+                }
+                Inputstatus::EnterCursor(p,c,a,_) => {
+                  let a2 = a.append(Action::Cmd(Command::Move(Dir::L)));
+                  let content = build_content(&a2,true).head().unwrap_or(&"".to_string()).clone();
+                  Inputstatus::EnterCursor(
+                    p,c,a2,
+                    content
+                  )                  
+                }
+              };
               needs_update = true;
             }
           }
           Key::Right => {
-            if command_key_down {println!("C: Right");}
+            if command_key_down {
+              println!("Mode: Right");
+              status = match status {
+                Inputstatus::Insert(_) => {
+                  Inputstatus::Insert(Dir::R)
+                }
+                Inputstatus::Overwrite(_) => {
+                  Inputstatus::Overwrite(Dir::R)
+                }
+                Inputstatus::EnterCursor(p,c,a,ct) => {
+                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                }
+              };
+            }
             else{
-              inputs = inputs.append(
-                Action::Cmd(Command::Move(Dir::R))
-              );
+              status = match status {
+                Inputstatus::Insert(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Move(Dir::R))
+                  );
+                  Inputstatus::Insert(d)
+                }
+                Inputstatus::Overwrite(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Move(Dir::R))
+                  );
+                  Inputstatus::Overwrite(d)
+                }
+                Inputstatus::EnterCursor(p,c,a,_) => {
+                  let a2 = a.append(Action::Cmd(Command::Move(Dir::R)));
+                  let content = build_content(&a2,true).head().unwrap_or(&"".to_string()).clone();
+                  Inputstatus::EnterCursor(
+                    p,c,a2,
+                    content
+                  )                  
+                }
+              };
               needs_update = true;
             }
+          }
+          Key::D => {
+            if command_key_down {
+              status = match status {
+                Inputstatus::Insert(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Rem(d.clone()))
+                  );
+                  Inputstatus::Insert(d)
+                }
+                Inputstatus::Overwrite(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Rem(d.clone()))
+                  );
+                  Inputstatus::Overwrite(d)
+                }
+                Inputstatus::EnterCursor(p,c,a,_) => {
+                  let a2 = a.append(Action::Cmd(Command::Rem(Dir::R)));
+                  let content = build_content(&a2,true).head().unwrap_or(&"".to_string()).clone();
+                  Inputstatus::EnterCursor(
+                    p,c,a2,
+                    content
+                  )                  
+                }
+              };
+              needs_update = true;
+            } else {continue}
           }
           Key::Backspace  => {
             if command_key_down {println!("C: Backspace");}
             else{
-              inputs = inputs.append(
-                Action::Cmd(Command::Rem(Dir::L))
-              );
+              status = match status {
+                Inputstatus::Insert(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Rem(d.opp()))
+                  );
+                  Inputstatus::Insert(d) 
+                }
+                Inputstatus::Overwrite(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Rem(d.opp()))
+                  );
+                  Inputstatus::Overwrite(d) 
+                }
+                Inputstatus::EnterCursor(p,c,a,_) => {
+                  let a2 = a.append(Action::Cmd(Command::Rem(Dir::L)));
+                  let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+                  Inputstatus::EnterCursor(
+                    p,c,a2,
+                    content
+                  )                  
+                }
+              };
               needs_update = true;
             }
           }
           Key::Return => {
             if command_key_down {println!("C: Return");}
             else {
-              inputs = inputs.append(
-                Action::Cmd(Command::Ins("\n".to_string(), Dir::L))
-              );
+              status = match status {
+                Inputstatus::Insert(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
+                  );
+                  Inputstatus::Insert(d)
+                }
+                Inputstatus::Overwrite(d) => {
+                  inputs = inputs.append(
+                    Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
+                  );
+                  Inputstatus::Overwrite(d)
+                }
+                Inputstatus::EnterCursor(p,c,a,_) => {
+                  let content = build_content(&a, false).head().unwrap_or(&"".to_string()).clone();
+                  let newcommand = match c {
+                      CCs::Mk => {Command::Mk(content)}
+                      CCs::Switch => {Command::Switch(content)}
+                      CCs::Jmp => {Command::Jmp(content)}
+                      CCs::Join => {Command::Join(content)}
+                  };
+                  inputs = inputs.append(Action::Cmd(newcommand));
+                  *p
+                }
+              };
               needs_update = true;
             }
           }
           Key::Z => {
             if command_key_down {
-              inputs = inputs.append(Action::Undo);
+              let newstatus = match status {
+                Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+                  inputs = inputs.append(Action::Undo);
+                  status
+                }
+                Inputstatus::EnterCursor(p,cc,a,_) => {
+                  let a2 = a.append(Action::Undo);
+                  let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+                  Inputstatus::EnterCursor(
+                    p,cc,a2,
+                    content
+                  )
+                }
+              };
+              status = newstatus;
               needs_update = true;
             } else {continue}
           }
           Key::Y => {
             if command_key_down {
-              inputs = inputs.append(Action::Redo);
+              let newstatus = match status {
+                Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+                  inputs = inputs.append(Action::Redo);
+                  status
+                }
+                Inputstatus::EnterCursor(p,cc,a,_) => {
+                  let a2 = a.append(Action::Redo);
+                  let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+                  Inputstatus::EnterCursor(
+                    p,cc,a2,
+                    content
+                  )
+                }
+              };
+              status = newstatus;
               needs_update = true;
+            } else {continue}
+          }
+          Key::M => {
+            if command_key_down{
+                let newstatus = match status {
+                  Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+                    Inputstatus::EnterCursor(Box::new(status), CCs::Mk, List::new(), "".to_string())
+                  }
+                  Inputstatus::EnterCursor(_,_,_,_) => {
+                    status
+                  }
+                };
+                status = newstatus;
+                needs_update = true;
             } else {continue}
           }
           _ => {
@@ -327,10 +626,17 @@ fn main() {
       }
       Event::Render(args) => {
         if needs_update {
-          content_text = build_content(&inputs);
+          content_text = build_content(&inputs, true);
           needs_update = false
         }
-        gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text));
+        match status {
+          Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+            gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text));
+          }
+          Inputstatus::EnterCursor(_, ref cc, _, ref ct) => {           
+            gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), ct));
+          }
+        }
         
       }
       _ => {}
