@@ -52,20 +52,12 @@ impl<T> List<T> {
 }
 
 impl<T: Clone> List<T> {
-  //TODO: If possible, better use of '&' and 'ref' here
   pub fn rev(&self) -> List<T> {
-    fn rev<E: Clone>(&ref i: &Link<E>, o: Link<E>) -> Link<E> {
-      match i {
-        &None => {o}
-        &Some(ref n) => {
-          rev(&n.next, Some(Rc::new(Node {
-            elem: n.elem.clone(),
-            next: o
-          })))
-        }
-      }
+    let mut outlist = List::new();
+    for item in self.iter() {
+      outlist = outlist.append(item.clone())
     }
-    List { head: rev(&self.head, None) }
+    outlist
   }
 }
 
