@@ -66,13 +66,13 @@ enum CCs {
 }
 
 enum Inputstatus {
-  Insert(Dir),
-  Overwrite(Dir),
+  Insert(Dir, bool),    //Mode, direction, showcursors
+  Overwrite(Dir, bool),
   EnterCursor(
-    Box<Inputstatus>,    // prior input status
-    CCs,            // current command in process
-    List<Action>,   // actions generating new cursor
-    String,         // new cursor in progress
+    Box<Inputstatus>,   // prior input status
+    CCs,                // current command in process
+    List<Action>,       // actions generating new cursor
+    String,             // new cursor in progress
   )
 }
 
@@ -89,7 +89,7 @@ fn al_to_ub(acts: &List<Action>) -> Zip<Command> {
     match *act {
       Action::Undo => {
         match content.head() {
-          None => {println!("Can't Undo");(List::new(),buffer)}
+          None => {(List::new(),buffer)}
           Some(d) => {
             (content.tail(),
               buffer.append(d.clone()))
@@ -98,7 +98,7 @@ fn al_to_ub(acts: &List<Action>) -> Zip<Command> {
       },
       Action::Redo => {
         match buffer.head() {
-          None => {println!("Can't Redo");(content,List::new())}
+          None => {(content,List::new())}
           Some(d) => {
             (content.append(d.clone()),
               buffer.tail())
@@ -116,59 +116,90 @@ fn al_to_ub(acts: &List<Action>) -> Zip<Command> {
   (content,buffer)
 }
 
+//move the zipper through cursors in the given direction 
+fn passthrough(direction: Dir, before: List<Symbol>, after: List<Symbol>)
+  -> (List<Symbol>, List<Symbol>) {
+  let mut head;
+  let mut first;
+  let mut second;
+
+  match direction {
+    Dir::L => {
+      first = before;
+      second = after;
+    }
+    Dir::R => {
+      first = after;
+      second = before;
+    }
+  }
+
+  loop {
+    head = first.head().map(|h| h.clone());
+    match head {
+      Some(Symbol::Cur(c)) => {
+        first = first.tail();
+        second = second.append(Symbol::Cur(c.clone()));
+      }
+      _ => {break}
+    }
+  }
+
+  match direction {
+    Dir::L => {(first, second)}
+    Dir::R => {(second, first)}
+  }
+}
+
+
 // command list to content zipper
 fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
-  let mut before = List::new();
-  let mut after = List::new();
+  let mut before: List<Symbol> = List::new();
+  let mut after: List<Symbol> = List::new();
 
   for command in commands.iter() {
     let (before2, after2) =
     match *command {
       Command::Ins(ref d, Dir::R) => {
-        (before.append(Symbol::Data(d.clone())),
-          after)
+        let (b, a) = passthrough(Dir::R, before, after);
+        (b.append(Symbol::Data(d.clone())), a)
       }
       Command::Ins(ref d, Dir::L) => {
-        (before,
-          after.append(Symbol::Data(d.clone())))
+        let (b, a) = passthrough(Dir::L, before, after);
+        (b, a.append(Symbol::Data(d.clone())))
       }
       Command::Rem(Dir::L) => {
-        (before.tail(),
-          after)
+        let (b, a) = passthrough(Dir::L, before, after);
+        (b.tail(), a)
       }
       Command::Rem(Dir::R) => {
-        (before,
-          after.tail())
+        let (b, a) = passthrough(Dir::R, before, after);
+        (b, a.tail())
       }
       Command::Move(Dir::L) => {
-        match before.head() {
-          None => {println!("At start");(List::new(),after)}
-          Some(d) => {
-            (before.tail(),
-              after.append(d.clone()))
-          }
+        let (b, a) = passthrough(Dir::L, before, after);
+        match b.head() {
+          None => {(List::new(), a)}
+          Some(d) => {(b.tail(), a.append(d.clone()))}
         }
       }
       Command::Move(Dir::R) => {
-        match after.head() {
-          None => {println!("At end");(before,List::new())}
-          Some(d) => {
-            (before.append(d.clone()),
-              after.tail())
-          }
+        let (b, a) = passthrough(Dir::R, before, after);
+        match a.head() {
+          None => {(b, List::new())}
+          Some(d) => {(b.append(d.clone()), a.tail())}
         }
       }
       Command::Ovr(ref d, Dir::L) => {
-        (before.tail(),
-          after.append(Symbol::Data(d.clone())))
+        let (b, a) = passthrough(Dir::L, before, after);
+        (b.tail(), a.append(Symbol::Data(d.clone())))
       }
       Command::Ovr(ref d, Dir::R) => {
-        (before.append(Symbol::Data(d.clone())),
-          after.tail())
+        let (b, a) = passthrough(Dir::R, before, after);
+        (b.append(Symbol::Data(d.clone())), a.tail())
       }
       Command::Mk(ref c) => {
-        (before.append(Symbol::Cur(c.clone())),
-          after)
+        (before.append(Symbol::Cur(c.clone())), after)
       }
       _ => {println!("Unsupported opperation");(before,after)}
       // Switch(Cursor),
@@ -183,14 +214,14 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
   (before, "0".to_string(), after)
 }
 
-fn makelines(before: &List<Symbol>, after: &List<Symbol>, addcursor: bool) -> List<String> {
+fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
 
   for s in after.iter() {
     match *s {
       Symbol::Cur(ref c) => {
-        partial = partial + "<" + &c + ">"
+        if showcursors {partial = partial + "<" + &c + ">"}
       }
       Symbol::Data(ref d) => {
         if d == "\n" {
@@ -203,7 +234,7 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addcursor: bool) -> Li
   out = out.append(partial).rev();
 
   //concat the two sides with cursor
-  let cur = if addcursor {"|"} else {""};
+  let cur = if addbar {"|"} else {""};
   match out.head(){
     None => {partial = cur.to_string();}
     Some(t) => {partial = cur.to_string() + t;}
@@ -213,7 +244,7 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addcursor: bool) -> Li
   for s in before.iter() {
     match *s {
       Symbol::Cur(ref c) => {
-        partial = "<".to_string() + &c + ">" + &partial
+        if showcursors {partial = "<".to_string() + &c + ">" + &partial}
       }
       Symbol::Data(ref d) => {
         if d == "\n" {
@@ -228,10 +259,10 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addcursor: bool) -> Li
   out
 }
 
-fn build_content(keys: &List<Action>, addcursor: bool) -> List<String> {
+fn build_content(keys: &List<Action>, addcursor: bool, showcursors: bool) -> List<String> {
   let (commands, _) = al_to_ub(&keys.rev());
   let (before, _, after) = cl_to_cz(&commands.rev());
-  makelines(&before, &after, addcursor)
+  makelines(&before, &after, addcursor, showcursors)
 }
 
 fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>) {
@@ -302,7 +333,7 @@ fn main() {
 
   let mut needs_update = true;
   let mut command_key_down = false;
-  let mut status = Inputstatus::Insert(Dir::R);
+  let mut status = Inputstatus::Insert(Dir::R, false);
   let mut inputs = List::new();
   let mut content_text = List::new().append("".to_string());
 
@@ -312,17 +343,17 @@ fn main() {
       Event::Input(Input::Text(t)) => {
         if t == "" || command_key_down {continue}
         status = match status {
-          Inputstatus::Insert(d) => {
+          Inputstatus::Insert(d, s) => {
             inputs = inputs.append(Action::Cmd(Command::Ins(t,d.clone())));
-            Inputstatus::Insert(d)
+            Inputstatus::Insert(d, s)
           }
-          Inputstatus::Overwrite(d) => {
+          Inputstatus::Overwrite(d, s) => {
             inputs = inputs.append(Action::Cmd(Command::Ovr(t,d.clone())));
-            Inputstatus::Overwrite(d)
+            Inputstatus::Overwrite(d, s)
           }
           Inputstatus::EnterCursor(p,c,a,_) => {
             let a2 = a.append(Action::Cmd(Command::Ins(t,Dir::R)));
-            let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+            let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
             Inputstatus::EnterCursor(
               p,c,a2,
               content
@@ -369,8 +400,8 @@ fn main() {
             if command_key_down {
               println!("Mode: Overwrite");
               status = match status {
-                Inputstatus::Insert(d) | Inputstatus::Overwrite(d) => {
-                  Inputstatus::Overwrite(d)
+                Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
+                  Inputstatus::Overwrite(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,ct) => {
                   Inputstatus::EnterCursor(p,c,a,ct)                  
@@ -384,8 +415,8 @@ fn main() {
             if command_key_down {
               println!("Mode: Insert");
               status = match status {
-                Inputstatus::Insert(d) | Inputstatus::Overwrite(d) => {
-                  Inputstatus::Insert(d)
+                Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
+                  Inputstatus::Insert(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,ct) => {
                   Inputstatus::EnterCursor(p,c,a,ct)                  
@@ -399,11 +430,11 @@ fn main() {
             if command_key_down {
               println!("Mode: Left");
               status = match status {
-                Inputstatus::Insert(_) => {
-                  Inputstatus::Insert(Dir::L)
+                Inputstatus::Insert(_, s) => {
+                  Inputstatus::Insert(Dir::L, s)
                 }
-                Inputstatus::Overwrite(_) => {
-                  Inputstatus::Overwrite(Dir::L)
+                Inputstatus::Overwrite(_, s) => {
+                  Inputstatus::Overwrite(Dir::L, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,ct) => {
                   Inputstatus::EnterCursor(p,c,a,ct)                  
@@ -412,21 +443,21 @@ fn main() {
             }
             else{
               status = match status {
-                Inputstatus::Insert(d) => {
+                Inputstatus::Insert(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Move(Dir::L))
                   );
-                  Inputstatus::Insert(d)
+                  Inputstatus::Insert(d, s)
                 }
-                Inputstatus::Overwrite(d) => {
+                Inputstatus::Overwrite(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Move(Dir::L))
                   );
-                  Inputstatus::Overwrite(d)
+                  Inputstatus::Overwrite(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Move(Dir::L)));
-                  let content = build_content(&a2,true).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a2,true,false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -440,11 +471,11 @@ fn main() {
             if command_key_down {
               println!("Mode: Right");
               status = match status {
-                Inputstatus::Insert(_) => {
-                  Inputstatus::Insert(Dir::R)
+                Inputstatus::Insert(_, s) => {
+                  Inputstatus::Insert(Dir::R, s)
                 }
-                Inputstatus::Overwrite(_) => {
-                  Inputstatus::Overwrite(Dir::R)
+                Inputstatus::Overwrite(_, s) => {
+                  Inputstatus::Overwrite(Dir::R, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,ct) => {
                   Inputstatus::EnterCursor(p,c,a,ct)                  
@@ -453,21 +484,21 @@ fn main() {
             }
             else{
               status = match status {
-                Inputstatus::Insert(d) => {
+                Inputstatus::Insert(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Move(Dir::R))
                   );
-                  Inputstatus::Insert(d)
+                  Inputstatus::Insert(d, s)
                 }
-                Inputstatus::Overwrite(d) => {
+                Inputstatus::Overwrite(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Move(Dir::R))
                   );
-                  Inputstatus::Overwrite(d)
+                  Inputstatus::Overwrite(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Move(Dir::R)));
-                  let content = build_content(&a2,true).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -480,21 +511,21 @@ fn main() {
           Key::D => {
             if command_key_down {
               status = match status {
-                Inputstatus::Insert(d) => {
+                Inputstatus::Insert(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Rem(d.clone()))
                   );
-                  Inputstatus::Insert(d)
+                  Inputstatus::Insert(d, s)
                 }
-                Inputstatus::Overwrite(d) => {
+                Inputstatus::Overwrite(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Rem(d.clone()))
                   );
-                  Inputstatus::Overwrite(d)
+                  Inputstatus::Overwrite(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Rem(Dir::R)));
-                  let content = build_content(&a2,true).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -508,21 +539,21 @@ fn main() {
             if command_key_down {println!("C: Backspace");}
             else{
               status = match status {
-                Inputstatus::Insert(d) => {
+                Inputstatus::Insert(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Rem(d.opp()))
                   );
-                  Inputstatus::Insert(d) 
+                  Inputstatus::Insert(d, s) 
                 }
-                Inputstatus::Overwrite(d) => {
+                Inputstatus::Overwrite(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Rem(d.opp()))
                   );
-                  Inputstatus::Overwrite(d) 
+                  Inputstatus::Overwrite(d, s) 
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Rem(Dir::L)));
-                  let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -536,20 +567,20 @@ fn main() {
             if command_key_down {println!("C: Return");}
             else {
               status = match status {
-                Inputstatus::Insert(d) => {
+                Inputstatus::Insert(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
                   );
-                  Inputstatus::Insert(d)
+                  Inputstatus::Insert(d, s)
                 }
-                Inputstatus::Overwrite(d) => {
+                Inputstatus::Overwrite(d, s) => {
                   inputs = inputs.append(
                     Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
                   );
-                  Inputstatus::Overwrite(d)
+                  Inputstatus::Overwrite(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
-                  let content = build_content(&a, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a, false, false).head().unwrap_or(&"".to_string()).clone();
                   let newcommand = match c {
                       CCs::Mk => {Command::Mk(content)}
                       CCs::Switch => {Command::Switch(content)}
@@ -566,13 +597,13 @@ fn main() {
           Key::Z => {
             if command_key_down {
               let newstatus = match status {
-                Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
                   inputs = inputs.append(Action::Undo);
                   status
                 }
                 Inputstatus::EnterCursor(p,cc,a,_) => {
                   let a2 = a.append(Action::Undo);
-                  let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,cc,a2,
                     content
@@ -586,13 +617,13 @@ fn main() {
           Key::Y => {
             if command_key_down {
               let newstatus = match status {
-                Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
                   inputs = inputs.append(Action::Redo);
                   status
                 }
                 Inputstatus::EnterCursor(p,cc,a,_) => {
                   let a2 = a.append(Action::Redo);
-                  let content = build_content(&a2, true).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,cc,a2,
                     content
@@ -606,7 +637,7 @@ fn main() {
           Key::M => {
             if command_key_down{
                 let newstatus = match status {
-                  Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+                  Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
                     Inputstatus::EnterCursor(Box::new(status), CCs::Mk, List::new(), "".to_string())
                   }
                   Inputstatus::EnterCursor(_,_,_,_) => {
@@ -614,6 +645,22 @@ fn main() {
                   }
                 };
                 status = newstatus;
+                needs_update = true;
+            } else {continue}
+          }
+          Key::S => {
+            if command_key_down{
+                status = match status {
+                  Inputstatus::Insert(d, s) => {
+                    Inputstatus::Insert(d, !s)
+                  }
+                  Inputstatus::Overwrite(d, s) => {
+                    Inputstatus::Overwrite(d, !s)
+                  }
+                  Inputstatus::EnterCursor(p,c,a,ct) => {
+                    Inputstatus::EnterCursor(p,c,a,ct)
+                  }
+                };
                 needs_update = true;
             } else {continue}
           }
@@ -625,12 +672,12 @@ fn main() {
         }
       }
       Event::Render(args) => {
-        if needs_update {
-          content_text = build_content(&inputs, true);
-          needs_update = false
-        }
         match status {
-          Inputstatus::Insert(_) | Inputstatus::Overwrite(_) => {
+          Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
+            if needs_update {
+              content_text = build_content(&inputs, true, s);
+              needs_update = false
+            }
             gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text));
           }
           Inputstatus::EnterCursor(_, ref cc, _, ref ct) => {           
