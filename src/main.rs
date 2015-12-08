@@ -248,15 +248,28 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
       Command::Mk(ref c) => {
         (before.append(Symbol::Cur(c.clone())), ccursor, after)
       }
-      // Switch(Cursor),
-      // Jmp(Cursor),
+      Command::Switch(ref c) => {
+        let withcursor = before.append(Symbol::Cur(ccursor.clone()));
+        match join_cursor(c.clone(), &withcursor, &after) {
+          Some((b,a)) => {(b, c.clone(), a)}
+          None => {(before, ccursor, after)}
+        }
+      }
+      Command::Jmp(ref c) => {
+        match join_cursor(c.clone(), &before, &after) {
+          Some((b,a)) => {
+            let withcursor = b.append(Symbol::Cur(c.clone()));
+            (withcursor, c.clone(), a)
+          }
+          None => {(before, ccursor, after)}
+        }
+      }
       Command::Join(ref c) => {
         match join_cursor(c.clone(), &before, &after) {
           Some((b,a)) => {(b, c.clone(), a)}
           None => {(before, ccursor, after)}
         }
       }
-      _ => {println!("Unsupported opperation");(before, ccursor, after)}
     };
 
     before = before2;
@@ -692,13 +705,34 @@ fn main() {
                 needs_update = true;
             } else {continue}
           }
-          /*Switch*/ Key::H |
-          /*Jmp*/ Key::J =>
-          {
+          /*Switch*/ Key::H => {
             if command_key_down {
-              println!("C: {:?}", key);
-            } else {continue};
-          }
+              let newstatus = match status {
+                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Switch, List::new(), "".to_string())
+                }
+                Inputstatus::EnterCursor(_,_,_,_) => {
+                  status
+                }
+              };
+              status = newstatus;
+              needs_update = true;
+           }else{continue}
+          } 
+          /*Jmp*/ Key::J => {
+            if command_key_down {
+              let newstatus = match status {
+                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, List::new(), "".to_string())
+                }
+                Inputstatus::EnterCursor(_,_,_,_) => {
+                  status
+                }
+              };
+              status = newstatus;
+              needs_update = true;
+           }else{continue}
+          } 
           /*Join*/ Key::N => {
             if command_key_down {
               let newstatus = match status {
