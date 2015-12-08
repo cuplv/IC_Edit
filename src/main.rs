@@ -151,67 +151,120 @@ fn passthrough(direction: Dir, before: List<Symbol>, after: List<Symbol>)
   }
 }
 
+fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>)
+  -> Option<(List<Symbol>, List<Symbol>)> {
+  let mut first = l.clone();
+  let mut second = r.clone();
+
+  //search left
+  loop {
+    match first.head().map(|h| h.clone()) {
+      None => {break}
+      Some(Symbol::Data(d)) => {
+        first = first.tail();
+        second = second.append(Symbol::Data(d));
+      }
+      Some(Symbol::Cur(c)) => {
+        if cur == c {
+          return Some((first.tail(),second))
+        }else{
+          first = first.tail();
+          second = second.append(Symbol::Cur(c));
+        }
+      }
+    }
+  }
+  //search right
+  first = l.clone();
+  second = r.clone();
+  loop {
+    match second.head().map(|h| h.clone()) {
+      None => {return None}
+      Some(Symbol::Data(d)) => {
+        second = second.tail();
+        first = first.append(Symbol::Data(d));
+      }
+      Some(Symbol::Cur(c)) => {
+        if cur == c {
+          return Some((first,second.tail()))
+        }else{
+          second = second.tail();
+          first = first.append(Symbol::Cur(c));
+        }
+      }
+    }
+  }
+
+}
+
 
 // command list to content zipper
 fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
   let mut before: List<Symbol> = List::new();
+  let mut ccursor: Cursor = "0".to_string();
   let mut after: List<Symbol> = List::new();
 
   for command in commands.iter() {
-    let (before2, after2) =
+    let (before2, ccursor2, after2) =
     match *command {
       Command::Ins(ref d, Dir::R) => {
         let (b, a) = passthrough(Dir::R, before, after);
-        (b.append(Symbol::Data(d.clone())), a)
+        (b.append(Symbol::Data(d.clone())), ccursor, a)
       }
       Command::Ins(ref d, Dir::L) => {
         let (b, a) = passthrough(Dir::L, before, after);
-        (b, a.append(Symbol::Data(d.clone())))
+        (b, ccursor, a.append(Symbol::Data(d.clone())))
       }
       Command::Rem(Dir::L) => {
         let (b, a) = passthrough(Dir::L, before, after);
-        (b.tail(), a)
+        (b.tail(), ccursor, a)
       }
       Command::Rem(Dir::R) => {
         let (b, a) = passthrough(Dir::R, before, after);
-        (b, a.tail())
+        (b, ccursor, a.tail())
       }
       Command::Move(Dir::L) => {
         let (b, a) = passthrough(Dir::L, before, after);
         match b.head() {
-          None => {(List::new(), a)}
-          Some(d) => {(b.tail(), a.append(d.clone()))}
+          None => {(List::new(), ccursor, a)}
+          Some(d) => {(b.tail(), ccursor, a.append(d.clone()))}
         }
       }
       Command::Move(Dir::R) => {
         let (b, a) = passthrough(Dir::R, before, after);
         match a.head() {
-          None => {(b, List::new())}
-          Some(d) => {(b.append(d.clone()), a.tail())}
+          None => {(b, ccursor, List::new())}
+          Some(d) => {(b.append(d.clone()), ccursor, a.tail())}
         }
       }
       Command::Ovr(ref d, Dir::L) => {
         let (b, a) = passthrough(Dir::L, before, after);
-        (b.tail(), a.append(Symbol::Data(d.clone())))
+        (b.tail(), ccursor, a.append(Symbol::Data(d.clone())))
       }
       Command::Ovr(ref d, Dir::R) => {
         let (b, a) = passthrough(Dir::R, before, after);
-        (b.append(Symbol::Data(d.clone())), a.tail())
+        (b.append(Symbol::Data(d.clone())), ccursor, a.tail())
       }
       Command::Mk(ref c) => {
-        (before.append(Symbol::Cur(c.clone())), after)
+        (before.append(Symbol::Cur(c.clone())), ccursor, after)
       }
-      _ => {println!("Unsupported opperation");(before,after)}
       // Switch(Cursor),
       // Jmp(Cursor),
-      // Join(Cursor),
+      Command::Join(ref c) => {
+        match join_cursor(c.clone(), &before, &after) {
+          Some((b,a)) => {(b, c.clone(), a)}
+          None => {(before, ccursor, after)}
+        }
+      }
+      _ => {println!("Unsupported opperation");(before, ccursor, after)}
     };
 
     before = before2;
     after = after2;
+    ccursor = ccursor2;
   }
 
-  (before, "0".to_string(), after)
+  (before, ccursor, after)
 }
 
 fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
@@ -290,15 +343,15 @@ fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut Glyp
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
   //println!("{:?}", &t);
-  let size = 48.0;
-  let mut text = graphics::Text::new(48);
+  let size = 32.0;
+  let mut text = graphics::Text::new(32);
   text.color = [1.0, 1.0, 1.0, 1.0];
   let (px,py) = (200.0,250.0);
   let prompt = match cc {
     CCs::Mk => {"Create cursor: "}
     CCs::Switch => {"Switch to cursor: "}
     CCs::Jmp => {"Jump to cursor: "}
-    CCs::Join => {"Join with cursot: "}
+    CCs::Join => {"Join with cursor: "}
   }.to_string();
 
   text.draw(
@@ -387,15 +440,6 @@ fn main() {
             command_key_down = true;
           }
 
-          //unimplemented keys
-          Key::H | //Switch
-          Key::J | //Jmp
-          Key::N => //Join
-          {
-            if command_key_down {
-              println!("C: {:?}", key);
-            } else {continue};
-          }
           Key::Up => {
             if command_key_down {
               println!("Mode: Overwrite");
@@ -634,7 +678,7 @@ fn main() {
               needs_update = true;
             } else {continue}
           }
-          Key::M => {
+          /*Mk*/ Key::M => {
             if command_key_down{
                 let newstatus = match status {
                   Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
@@ -648,6 +692,27 @@ fn main() {
                 needs_update = true;
             } else {continue}
           }
+          /*Switch*/ Key::H |
+          /*Jmp*/ Key::J =>
+          {
+            if command_key_down {
+              println!("C: {:?}", key);
+            } else {continue};
+          }
+          /*Join*/ Key::N => {
+            if command_key_down {
+              let newstatus = match status {
+                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Join, List::new(), "".to_string())
+                }
+                Inputstatus::EnterCursor(_,_,_,_) => {
+                  status
+                }
+              };
+              status = newstatus;
+              needs_update = true;
+           }else{continue}
+          } 
           Key::S => {
             if command_key_down{
                 status = match status {

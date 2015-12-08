@@ -74,6 +74,12 @@ impl<T> Drop for List<T> {
   }
 }
 
+impl<T> Clone for List<T> {
+  fn clone(&self) -> Self {
+    List {head: self.head.clone() }
+  }
+}
+
 impl<'a, T> Iterator for Iter<'a, T> {
   type Item = &'a T;
 
@@ -140,6 +146,27 @@ mod test {
     let list = list.tail();
     assert_eq!(list.head(), None);
     
+  }
+
+  #[test]
+  fn clone() {
+    let list = List::new().append(1).append(2).append(3);
+    let listc = list.clone();
+    let list = list.append(4).append(5).append(6);
+
+    let mut iter = listc.iter();
+    assert_eq!(iter.next(), Some(&3));
+    assert_eq!(iter.next(), Some(&2));
+    assert_eq!(iter.next(), Some(&1));
+
+    let mut iter = list.iter();
+    assert_eq!(iter.next(), Some(&6));
+    assert_eq!(iter.next(), Some(&5));
+    assert_eq!(iter.next(), Some(&4));
+    assert_eq!(iter.next(), Some(&3));
+    assert_eq!(iter.next(), Some(&2));
+    assert_eq!(iter.next(), Some(&1));
+
   }
 
 }
