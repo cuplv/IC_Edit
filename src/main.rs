@@ -1,3 +1,4 @@
+extern crate time;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -6,6 +7,7 @@ extern crate piston;
 mod functional;
 
 use std::env::current_exe;
+use time::Duration;
 use glutin_window::GlutinWindow;
 use graphics::Transformed;
 use opengl_graphics::{GlGraphics, OpenGL};
@@ -283,6 +285,7 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
 fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
+  let mut count = 40; //HACK: draw off the screen sometimes to make sure the screen is full
 
   for s in after.iter() {
     match *s {
@@ -293,6 +296,8 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcurs
         if d == "\n" {
           out = out.append(partial);
           partial = "".to_string();
+          count = count - 1;
+          if count <= 0 {break}
         } else {partial = partial + &d}
       }
     }
@@ -307,6 +312,7 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcurs
   }
   out = out.tail();
 
+  count = 20;
   for s in before.iter() {
     match *s {
       Symbol::Cur(ref c) => {
@@ -316,6 +322,8 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcurs
         if d == "\n" {
           out = out.append(partial);
           partial = "".to_string();
+          count = count - 1;
+          if count <= 0 {break}
         } else {partial = d.clone() + &partial}
       }
     }
@@ -331,7 +339,7 @@ fn build_content(keys: &List<Action>, addcursor: bool, showcursors: bool) -> Lis
   makelines(&before, &after, addcursor, showcursors)
 }
 
-fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>) {
+fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: Duration) {
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
   //println!("{:?}", &t);
@@ -350,6 +358,19 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
     loc += 20.0;
     if loc > 800.0 {break}
   }
+
+  let size = 16.0;
+  let mut text = graphics::Text::new(16);
+  text.color = [1.0, 0.0, 0.0, 1.0];
+  let (px,py) = (600.0, size*1.5);
+  let clock = "Time(ms): ".to_string() + &time.num_milliseconds().to_string();
+  text.draw(
+    &clock,
+    f,
+    &c.draw_state,
+    c.trans(px, py).transform,
+    g); 
+
 }
 
 fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, cc:CCs, t: &String) {
@@ -397,6 +418,7 @@ fn main() {
   let exe_directory = current_exe().unwrap().parent().unwrap().to_owned();
   let mut font = GlyphCache::new(&exe_directory.join("../../FiraMono-Bold.ttf")).unwrap();
 
+  let mut time = Duration::seconds(0);
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
@@ -774,10 +796,12 @@ fn main() {
         match status {
           Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
             if needs_update {
-              content_text = build_content(&inputs, true, s);
-              needs_update = false
+              time = Duration::span(|| {
+                content_text = build_content(&inputs, true, s);
+                needs_update = false
+              });
             }
-            gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text));
+            gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, time));
           }
           Inputstatus::EnterCursor(_, ref cc, _, ref ct) => {           
             gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), ct));
