@@ -261,7 +261,7 @@ fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
         match join_cursor(c.clone(), &before, &after) {
           Some((b,a)) => {
             let withcursor = b.append(Symbol::Cur(c.clone()));
-            (withcursor, c.clone(), a)
+            (withcursor, ccursor, a)
           }
           None => {(before, ccursor, after)}
         }
@@ -312,7 +312,7 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcurs
   }
   out = out.tail();
 
-  count = 20;
+  count = 20; //cursor no lower than half screen
   for s in before.iter() {
     match *s {
       Symbol::Cur(ref c) => {
@@ -769,7 +769,7 @@ fn main() {
               needs_update = true;
            }else{continue}
           } 
-          Key::S => {
+          /*Show/hide cursors*/Key::S => {
             if command_key_down{
                 status = match status {
                   Inputstatus::Insert(d, s) => {
