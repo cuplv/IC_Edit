@@ -1,4 +1,5 @@
 extern crate time;
+extern crate rand;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -19,6 +20,7 @@ use piston::window::WindowSettings;
 use functional::List;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
+const RND_START: i32 = 0000;
 
 type Cursor = String;
 
@@ -339,14 +341,67 @@ fn build_content(keys: &List<Action>, addcursor: bool, showcursors: bool) -> Lis
   makelines(&before, &after, addcursor, showcursors)
 }
 
+fn rnd_inputs(num: i32) -> List<Action> {
+  use rand::{Rng, ThreadRng, thread_rng};
+  let mut rng = thread_rng();
+  let mut cursor_count = 1;
+  let mut acts = List::new();
+
+  fn rnd_cursor(rng: &mut ThreadRng) -> Cursor {
+    let rn: u8 = rng.gen_range(48,58); //numbers
+    String::from_utf8(vec![rn]).unwrap()
+  }
+
+  fn rnd_char(rng: &mut ThreadRng) -> String {
+    let ascii: u8 = match rng.gen_range(0, 20) {
+      0 ... 4 => {32} //space
+      5 ... 6 => {rng.gen_range(48,48+10)} //numbers
+      7 ... 16 => {rng.gen_range(97,97+26)} //lower case
+      17 ... 18 => {rng.gen_range(65,65+26)} //upper case
+      _ => {13} //return
+    };
+    if ascii == 13 {"\n".to_string()} else {
+      String::from_utf8(vec![ascii]).unwrap()  
+    }
+  }
+
+  fn rnd_dir(rng: &mut ThreadRng) -> Dir {
+    if rng.gen() {Dir::R} else {Dir::L}
+  }
+
+  let mut rnd_action = |rng: &mut ThreadRng|{//(&rng: Rng) -> Action {
+    match rng.gen_range(0, 100) {
+      0 ... 17 => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
+      18 ... 62 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
+      63 ... 80 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
+      61 ... 98 => {Action::Cmd(Command::Move(rnd_dir(rng)))}
+      _ => match rng.gen_range(0, 3) {
+        0 => {
+          cursor_count = cursor_count + 1;
+          Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
+        }
+        1 => {Action::Cmd(Command::Switch(rnd_cursor(rng)))}
+        2 => {Action::Cmd(Command::Jmp(rnd_cursor(rng)))}
+        _ => {Action::Undo}
+      }
+    }
+  };
+
+  for _ in 0..num {
+    acts = acts.append(rnd_action(&mut rng));
+  }
+  acts
+}
+
 fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: Duration) {
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
   //println!("{:?}", &t);
 
+  let size = 22.0;
   let mut text = graphics::Text::new(22);
   text.color = [1.0, 1.0, 1.0, 1.0];
-  let mut loc = 20.0;
+  let mut loc = size;
 
   for st in t.iter() {
     text.draw(
@@ -355,7 +410,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
       &c.draw_state,
       c.trans(10.0, loc).transform,
       g); 
-    loc += 20.0;
+    loc += size;
     if loc > 800.0 {break}
   }
 
@@ -377,8 +432,8 @@ fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut Glyp
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
   //println!("{:?}", &t);
-  let size = 32.0;
-  let mut text = graphics::Text::new(32);
+  let size = 48.0;
+  let mut text = graphics::Text::new(48);
   text.color = [1.0, 1.0, 1.0, 1.0];
   let (px,py) = (200.0,250.0);
   let prompt = match cc {
@@ -422,7 +477,7 @@ fn main() {
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
-  let mut inputs = List::new();
+  let mut inputs = rnd_inputs(RND_START);
   let mut content_text = List::new().append("".to_string());
 
   for e in window.events().max_fps(60) {
