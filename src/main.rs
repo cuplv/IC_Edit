@@ -43,7 +43,7 @@ use piston::input::{Button, Event, Input, Key};
 use piston::window::WindowSettings;
 use functional::List;
 use editor_defs::*;
-//use spec::*;
+use spec::*;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
 
@@ -226,7 +226,7 @@ fn main() {
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
-  let mut inputs = rnd_inputs(rnd_start);
+  let mut main_edit = SpecEditor::new(rnd_inputs(rnd_start));
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
@@ -238,11 +238,11 @@ fn main() {
         if t == "" || command_key_down {continue}
         status = match status {
           Inputstatus::Insert(d, s) => {
-            inputs = inputs.append(Action::Cmd(Command::Ins(t,d.clone())));
+            main_edit.take_action(Action::Cmd(Command::Ins(t,d.clone())));
             Inputstatus::Insert(d, s)
           }
           Inputstatus::Overwrite(d, s) => {
-            inputs = inputs.append(Action::Cmd(Command::Ovr(t,d.clone())));
+            main_edit.take_action(Action::Cmd(Command::Ovr(t,d.clone())));
             Inputstatus::Overwrite(d, s)
           }
           Inputstatus::EnterCursor(p,c,a,_) => {
@@ -329,13 +329,13 @@ fn main() {
             else{
               status = match status {
                 Inputstatus::Insert(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Move(Dir::L))
                   );
                   Inputstatus::Insert(d, s)
                 }
                 Inputstatus::Overwrite(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Move(Dir::L))
                   );
                   Inputstatus::Overwrite(d, s)
@@ -370,13 +370,13 @@ fn main() {
             else{
               status = match status {
                 Inputstatus::Insert(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Move(Dir::R))
                   );
                   Inputstatus::Insert(d, s)
                 }
                 Inputstatus::Overwrite(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Move(Dir::R))
                   );
                   Inputstatus::Overwrite(d, s)
@@ -397,13 +397,13 @@ fn main() {
             if command_key_down {
               status = match status {
                 Inputstatus::Insert(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Rem(d.clone()))
                   );
                   Inputstatus::Insert(d, s)
                 }
                 Inputstatus::Overwrite(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Rem(d.clone()))
                   );
                   Inputstatus::Overwrite(d, s)
@@ -425,13 +425,13 @@ fn main() {
             else{
               status = match status {
                 Inputstatus::Insert(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Rem(d.opp()))
                   );
                   Inputstatus::Insert(d, s) 
                 }
                 Inputstatus::Overwrite(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Rem(d.opp()))
                   );
                   Inputstatus::Overwrite(d, s) 
@@ -453,13 +453,13 @@ fn main() {
             else {
               status = match status {
                 Inputstatus::Insert(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
                   );
                   Inputstatus::Insert(d, s)
                 }
                 Inputstatus::Overwrite(d, s) => {
-                  inputs = inputs.append(
+                  main_edit.take_action(
                     Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
                   );
                   Inputstatus::Overwrite(d, s)
@@ -472,7 +472,7 @@ fn main() {
                       CCs::Jmp => {Command::Jmp(content)}
                       CCs::Join => {Command::Join(content)}
                   };
-                  inputs = inputs.append(Action::Cmd(newcommand));
+                  main_edit.take_action(Action::Cmd(newcommand));
                   *p
                 }
               };
@@ -483,7 +483,7 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  inputs = inputs.append(Action::Undo);
+                  main_edit.take_action(Action::Undo);
                   status
                 }
                 Inputstatus::EnterCursor(p,cc,a,_) => {
@@ -503,7 +503,7 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  inputs = inputs.append(Action::Redo);
+                  main_edit.take_action(Action::Redo);
                   status
                 }
                 Inputstatus::EnterCursor(p,cc,a,_) => {
@@ -602,7 +602,7 @@ fn main() {
         if !needs_update {
           match more_inputs_iter.next() {
             Some(cmd) => {
-              inputs = inputs.append(cmd.clone());
+              main_edit.take_action(cmd.clone());
               needs_update = true;
             }
             None => {
@@ -616,7 +616,10 @@ fn main() {
           Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
             if needs_update {
               time = Duration::span(|| {
-                content_text = build_lines(&inputs, true, s);
+                content_text = main_edit.get_lines(&ViewParams{
+                  addcursor: true,
+                  showcursors: s
+                });
                 needs_update = false
               });
             }

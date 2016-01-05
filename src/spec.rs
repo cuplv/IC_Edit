@@ -1,7 +1,7 @@
 use functional::List;
 use editor_defs::*;
 
-struct SpecEditor {
+pub struct SpecEditor {
     actions: List<Action>
 }
 
