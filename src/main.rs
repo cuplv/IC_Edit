@@ -38,7 +38,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
 use piston::input::{Button, Event, Input, Key};
-use piston::window::{Window, WindowSettings};
+use piston::window::WindowSettings;
 use functional::List;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
@@ -906,7 +906,7 @@ fn main() {
               needs_update = true;
             }
             None => {
-              if auto_exit {panic!("stand-in for graceful exit")}
+              if auto_exit {break}
             }
           }
         }
