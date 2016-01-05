@@ -48,17 +48,6 @@ pub enum CCs {
   Mk, Switch, Jmp, Join
 }
 
-pub enum Inputstatus {
-  Insert(Dir, bool),    //Mode, direction, showcursors
-  Overwrite(Dir, bool),
-  EnterCursor(
-    Box<Inputstatus>,   // prior input status
-    CCs,                // current command in process
-    List<Action>,       // actions generating new cursor
-    String,             // new cursor in progress
-  )
-}
-
 pub type Zip<T> = (List<T>,List<T>);
 pub type CZip<T> = (List<T>,Cursor,List<T>);
 

@@ -46,6 +46,17 @@ use spec::*;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
 
+enum Inputstatus {
+  Insert(Dir, bool),    //Mode, direction, showcursors
+  Overwrite(Dir, bool),
+  EnterCursor(
+    Box<Inputstatus>,   // prior input status
+    CCs,                // current command in process
+    List<Action>,       // actions generating new cursor
+    String,             // new cursor in progress
+  )
+}
+
 fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
