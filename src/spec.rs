@@ -1,55 +1,7 @@
-
 use functional::List;
+use editor_defs::*;
 
-pub type Cursor = String;
 
-#[derive(Debug, Clone)]
-pub enum Dir {
-  L,
-  R,
-}
-
-impl Dir {
-  pub fn opp(&self) -> Dir {
-    match *self {
-      Dir::L => {Dir::R}
-      Dir::R => {Dir::L}
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub enum Symbol {
-	Cur(Cursor),
-	Data(String),
-}
-
-#[derive(Debug, Clone)]
-pub enum Action {
-  Cmd(Command),
-  Undo,
-  Redo,
-}
-
-#[derive(Debug, Clone)]
-pub enum Command {
-  Ins(String, Dir),   //Insert <String>, moving cursor <Dir>
-  Rem(Dir),           //Remove character located <Dir>
-  Move(Dir),          //Move cursor <Dir>
-  Ovr(String, Dir),   //Overwrite with <String>, moving cursor <Dir>
-  Mk(Cursor),
-  Switch(Cursor),
-  Jmp(Cursor),
-  Join(Cursor),
-}
-
-#[derive(Debug, Clone)]
-pub enum CCs {
-  Mk, Switch, Jmp, Join
-}
-
-pub type Zip<T> = (List<T>,List<T>);
-pub type CZip<T> = (List<T>,Cursor,List<T>);
 
 //Action list to undo buffer
 pub fn al_to_ub(acts: &List<Action>) -> Zip<Command> {
@@ -257,3 +209,61 @@ pub fn build_content(keys: &List<Action>) -> (List<Symbol>,List<Symbol>) {
   let (before, _, after) = cl_to_cz(&commands.rev());    
   (before, after)
 }
+
+pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
+  let mut out: List<String> = List::new();
+  let mut partial: String = "".to_string();
+  let mut count = 40; //HACK: draw off the screen sometimes to make sure the screen is full
+
+  for s in after.iter() {
+    match *s {
+      Symbol::Cur(ref c) => {
+        if showcursors {partial = partial + "<" + &c + ">"}
+      }
+      Symbol::Data(ref d) => {
+        if d == "\n" {
+          out = out.append(partial);
+          partial = "".to_string();
+          count = count - 1;
+          if count <= 0 {break}
+        } else {partial = partial + &d}
+      }
+    }
+  }
+  out = out.append(partial).rev();
+
+  //concat the two sides with cursor
+  let cur = if addbar {"|"} else {""};
+  match out.head(){
+    None => {partial = cur.to_string();}
+    Some(t) => {partial = cur.to_string() + t;}
+  }
+  out = out.tail();
+
+  count = 20; //cursor no lower than half screen
+  for s in before.iter() {
+    match *s {
+      Symbol::Cur(ref c) => {
+        if showcursors {partial = "<".to_string() + &c + ">" + &partial}
+      }
+      Symbol::Data(ref d) => {
+        if d == "\n" {
+          out = out.append(partial);
+          partial = "".to_string();
+          count = count - 1;
+          if count <= 0 {break}
+        } else {partial = d.clone() + &partial}
+      }
+    }
+  }
+  out = out.append(partial);
+
+  out
+}
+
+pub fn get_lines(keys: &List<Action>, vp: &ViewParams) -> List<String> {
+    let (before, after) = build_content(keys) ;
+    makelines(&before, &after, vp.addcursor, vp.showcursors)
+}
+
+

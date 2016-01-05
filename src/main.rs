@@ -29,6 +29,7 @@ extern crate piston;
 extern crate adapton;
 
 mod functional;
+mod editor_defs;
 mod spec;
 
 use std::env::current_exe;
@@ -41,8 +42,8 @@ use piston::event_loop::{Events, EventLoop};
 use piston::input::{Button, Event, Input, Key};
 use piston::window::WindowSettings;
 use functional::List;
-
-use spec::*;
+use editor_defs::*;
+//use spec::*;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
 
@@ -58,59 +59,7 @@ enum Inputstatus {
 }
 
 fn build_lines(keys: &List<Action>, addcursor: bool, showcursors: bool) -> List<String> {
-    let (before, after) = spec::build_content(keys) ;
-    makelines(&before, &after, addcursor, showcursors)
-}
-
-fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
-  let mut out: List<String> = List::new();
-  let mut partial: String = "".to_string();
-  let mut count = 40; //HACK: draw off the screen sometimes to make sure the screen is full
-
-  for s in after.iter() {
-    match *s {
-      Symbol::Cur(ref c) => {
-        if showcursors {partial = partial + "<" + &c + ">"}
-      }
-      Symbol::Data(ref d) => {
-        if d == "\n" {
-          out = out.append(partial);
-          partial = "".to_string();
-          count = count - 1;
-          if count <= 0 {break}
-        } else {partial = partial + &d}
-      }
-    }
-  }
-  out = out.append(partial).rev();
-
-  //concat the two sides with cursor
-  let cur = if addbar {"|"} else {""};
-  match out.head(){
-    None => {partial = cur.to_string();}
-    Some(t) => {partial = cur.to_string() + t;}
-  }
-  out = out.tail();
-
-  count = 20; //cursor no lower than half screen
-  for s in before.iter() {
-    match *s {
-      Symbol::Cur(ref c) => {
-        if showcursors {partial = "<".to_string() + &c + ">" + &partial}
-      }
-      Symbol::Data(ref d) => {
-        if d == "\n" {
-          out = out.append(partial);
-          partial = "".to_string();
-          count = count - 1;
-          if count <= 0 {break}
-        } else {partial = d.clone() + &partial}
-      }
-    }
-  }
-  out = out.append(partial);
-
-  out
+  spec::get_lines(keys, &ViewParams{addcursor: addcursor, showcursors: showcursors})
 }
 
 fn rnd_inputs(num: u32) -> List<Action> {
