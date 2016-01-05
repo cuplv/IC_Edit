@@ -31,6 +31,7 @@ extern crate adapton;
 mod functional;
 mod editor_defs;
 mod spec;
+mod fast;
 
 use std::env::current_exe;
 use time::Duration;
@@ -43,7 +44,6 @@ use piston::input::{Button, Event, Input, Key};
 use piston::window::WindowSettings;
 use functional::List;
 use editor_defs::*;
-use spec::*;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
 
@@ -196,7 +196,8 @@ fn main() {
     .about("Incremental Text Editor")
     .args_from_usage(
       "-x --width=[width] 'editor width in pixels'
-      -y --height=[height] 'editor height in pixels'")
+      -y --height=[height] 'editor height in pixels'
+      [fast] -f --fast 'make it fast'")
     .subcommand(clap::SubCommand::with_name("test")
       .about("test options")
       .args_from_usage(
@@ -204,7 +205,8 @@ fn main() {
         -y --height=[height] 'editor height in pixels'
         -s --rnd_start=[rnd_start] 'number of random starting commands'
         -a --rnd_adds=[rnd_adds] 'number of random commands after start'
-        [auto_exit] -e --auto_exit 'exit the editor when all random commands are complete'")
+        [auto_exit] -e --auto_exit 'exit the editor when all random commands are complete'
+        [use_adapton] -f --fast 'make it fast'")
     )
     .get_matches();
   //not the best usage of a subcommand, but ti works
@@ -214,6 +216,7 @@ fn main() {
   let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(DEFAULT_RND_START);
   let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(DEFAULT_RND_ADDITIONS);
   let auto_exit = test_args.is_present("auto_exit");
+  let use_adapton = test_args.is_present("use_adapton");
 
   //graphics
   let window = try_create_window(x, y).unwrap();
@@ -222,14 +225,16 @@ fn main() {
   let mut font = GlyphCache::new(&exe_directory.join("../../FiraMono-Bold.ttf")).unwrap();
 
   //loop data
+  let mut main_edit: Box<EditorPipeline>;
   let mut time = Duration::seconds(0);
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
-  let mut main_edit = SpecEditor::new(rnd_inputs(rnd_start));
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
+  if use_adapton { main_edit = Box::new(fast::AdaptEditor::new(rnd_inputs(rnd_start)))}
+    else{ main_edit = Box::new(spec::SpecEditor::new(rnd_inputs(rnd_start)))};
 
   for e in window.events().max_fps(60).ups(50) {
     match e {
