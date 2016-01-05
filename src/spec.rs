@@ -1,7 +1,17 @@
 use functional::List;
 use editor_defs::*;
 
+struct SpecEditor {
+    actions: List<Action>
+}
 
+impl SpecEditor {
+  pub fn new(initial_actions: List<Action>) -> SpecEditor {
+    SpecEditor{
+      actions: initial_actions
+    }
+  }
+}
 
 //Action list to undo buffer
 pub fn al_to_ub(acts: &List<Action>) -> Zip<Command> {
@@ -262,8 +272,18 @@ pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, show
 }
 
 pub fn get_lines(keys: &List<Action>, vp: &ViewParams) -> List<String> {
-    let (before, after) = build_content(keys) ;
+    let (before, after) = build_content(keys);
     makelines(&before, &after, vp.addcursor, vp.showcursors)
+}
+
+impl EditorPipeline for SpecEditor {
+    fn take_action(self: &mut Self, ac: Action) -> () {
+      self.actions = self.actions.append(ac);
+    }
+
+    fn get_lines(self: &Self, vp: &ViewParams) -> List<String> {
+      get_lines(&self.actions, vp)
+    }
 }
 
 
