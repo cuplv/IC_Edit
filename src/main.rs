@@ -1,5 +1,27 @@
+// Default parameters
+// ------------------
+
+// icedit -x <Num> / --width <Num>
+// Width in pixels
+const DEFAULT_WIDTH: u32 = 800;
+
+// icedit -y <Num> / --height <Num>
+// Height in pixels
+const DEFAULT_HEIGHT: u32 = 800;
+
+// icedit test -s <Num> / --rnd_start <Num>
+// number of random starting commands
+const DEFAULT_RND_START: u32 = 0000;
+
+// icedit test -a <Num> / --rnd_adds <Num>
+// nummer of random commands after start
+const DEFAULT_RND_ADDITIONS: u32 = 0;
+
+
 extern crate time;
 extern crate rand;
+#[macro_use]
+extern crate clap;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -16,12 +38,10 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
 use piston::input::{Button, Event, Input, Key};
-use piston::window::WindowSettings;
-
+use piston::window::{Window, WindowSettings};
 use functional::List;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
-const RND_START: i32 = 0000;
 
 type Cursor = String;
 
@@ -342,7 +362,7 @@ fn build_content(keys: &List<Action>, addcursor: bool, showcursors: bool) -> Lis
   makelines(&before, &after, addcursor, showcursors)
 }
 
-fn rnd_inputs(num: i32) -> List<Action> {
+fn rnd_inputs(num: u32) -> List<Action> {
   use rand::{Rng, ThreadRng, thread_rng};
   let mut rng = thread_rng();
   let mut cursor_count = 1;
@@ -460,28 +480,58 @@ fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut Glyp
 
 // Returns a result containing a GlutinWindow or an error if the window
 // settings are not supported
-fn try_create_window() -> Result<GlutinWindow, String> {
-  WindowSettings::new("ICEdit", [800, 800])
+fn try_create_window(x: u32, y: u32) -> Result<GlutinWindow, String> {
+  WindowSettings::new("ICEdit", [x, y])
     .exit_on_esc(true)
     .opengl(OPEN_GL)
     .build()
 }
 
 fn main() {
-    
-  let window = try_create_window().unwrap();
+
+  //command-line
+  let args = clap::App::new("IC_Edit")
+    .version("0.2")
+    .author("Kyle Headley <kyle.headley@colorado.edu>")
+    .about("Incremental Text Editor")
+    .args_from_usage(
+      "-x --width=[width] 'editor width in pixels'
+      -y --height=[height] 'editor height in pixels'")
+    .subcommand(clap::SubCommand::with_name("test")
+      .about("test options")
+      .args_from_usage(
+        "-x --width=[width] 'editor width in pixels'
+        -y --height=[height] 'editor height in pixels'
+        -s --rnd_start=[rnd_start] 'number of random starting commands'
+        -a --rnd_adds=[rnd_adds] 'number of random commands after start'
+        [auto_exit] -e --auto_exit 'exit the editor when all random commands are complete'")
+    )
+    .get_matches();
+  //not the best usage of a subcommand, but ti works
+  let test_args = if let Some(matches) = args.subcommand_matches("test") {matches} else {&args};
+  let x = value_t!(test_args.value_of("width"), u32).unwrap_or(DEFAULT_WIDTH);
+  let y = value_t!(test_args.value_of("height"), u32).unwrap_or(DEFAULT_HEIGHT);
+  let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(DEFAULT_RND_START);
+  let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(DEFAULT_RND_ADDITIONS);
+  let auto_exit = test_args.is_present("auto_exit");
+
+  //graphics
+  let window = try_create_window(x, y).unwrap();
   let mut gl = GlGraphics::new(OPEN_GL);
   let exe_directory = current_exe().unwrap().parent().unwrap().to_owned();
   let mut font = GlyphCache::new(&exe_directory.join("../../FiraMono-Bold.ttf")).unwrap();
 
+  //loop data
   let mut time = Duration::seconds(0);
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
-  let mut inputs = rnd_inputs(RND_START);
+  let mut inputs = rnd_inputs(rnd_start);
+  let more_inputs = rnd_inputs(rnd_adds);
+  let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
 
-  for e in window.events().max_fps(60) {
+  for e in window.events().max_fps(60).ups(50) {
     match e {
       //gives typed char or empty
       Event::Input(Input::Text(t)) => {
@@ -643,7 +693,7 @@ fn main() {
               needs_update = true;
             }
           }
-          Key::D => {
+          /*Delete*/Key::D => {
             if command_key_down {
               status = match status {
                 Inputstatus::Insert(d, s) => {
@@ -729,7 +779,7 @@ fn main() {
               needs_update = true;
             }
           }
-          Key::Z => {
+          /*Undo*/Key::Z => {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
@@ -749,7 +799,7 @@ fn main() {
               needs_update = true;
             } else {continue}
           }
-          Key::Y => {
+          /*Redo*/Key::Y => {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
@@ -844,6 +894,19 @@ fn main() {
           _ => {
             if command_key_down {
               println!("C: {:?}", key);
+            }
+          }
+        }
+      }
+      Event::Update(_) => {
+        if !needs_update {
+          match more_inputs_iter.next() {
+            Some(cmd) => {
+              inputs = inputs.append(cmd.clone());
+              needs_update = true;
+            }
+            None => {
+              if auto_exit {panic!("stand-in for graceful exit")}
             }
           }
         }
