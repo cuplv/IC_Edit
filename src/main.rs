@@ -57,6 +57,11 @@ enum Inputstatus {
   )
 }
 
+fn build_lines(keys: &List<Action>, addcursor: bool, showcursors: bool) -> List<String> {
+    let (before, after) = spec::build_content(keys) ;
+    makelines(&before, &after, addcursor, showcursors)
+}
+
 fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
@@ -106,12 +111,6 @@ fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcurs
   out = out.append(partial);
 
   out
-}
-
-fn build_content(keys: &List<Action>, addcursor: bool, showcursors: bool) -> List<String> {
-  let (commands, _) = al_to_ub(&keys.rev());
-  let (before, _, after) = cl_to_cz(&commands.rev());
-  makelines(&before, &after, addcursor, showcursors)
 }
 
 fn rnd_inputs(num: u32) -> List<Action> {
@@ -299,7 +298,7 @@ fn main() {
           }
           Inputstatus::EnterCursor(p,c,a,_) => {
             let a2 = a.append(Action::Cmd(Command::Ins(t,Dir::R)));
-            let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
+            let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
             Inputstatus::EnterCursor(
               p,c,a2,
               content
@@ -394,7 +393,7 @@ fn main() {
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Move(Dir::L)));
-                  let content = build_content(&a2,true,false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a2,true,false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -435,7 +434,7 @@ fn main() {
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Move(Dir::R)));
-                  let content = build_content(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -462,7 +461,7 @@ fn main() {
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Rem(Dir::R)));
-                  let content = build_content(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -490,7 +489,7 @@ fn main() {
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
                   let a2 = a.append(Action::Cmd(Command::Rem(Dir::L)));
-                  let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,c,a2,
                     content
@@ -517,7 +516,7 @@ fn main() {
                   Inputstatus::Overwrite(d, s)
                 }
                 Inputstatus::EnterCursor(p,c,a,_) => {
-                  let content = build_content(&a, false, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a, false, false).head().unwrap_or(&"".to_string()).clone();
                   let newcommand = match c {
                       CCs::Mk => {Command::Mk(content)}
                       CCs::Switch => {Command::Switch(content)}
@@ -540,7 +539,7 @@ fn main() {
                 }
                 Inputstatus::EnterCursor(p,cc,a,_) => {
                   let a2 = a.append(Action::Undo);
-                  let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,cc,a2,
                     content
@@ -560,7 +559,7 @@ fn main() {
                 }
                 Inputstatus::EnterCursor(p,cc,a,_) => {
                   let a2 = a.append(Action::Redo);
-                  let content = build_content(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
+                  let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
                   Inputstatus::EnterCursor(
                     p,cc,a2,
                     content
@@ -668,7 +667,7 @@ fn main() {
           Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
             if needs_update {
               time = Duration::span(|| {
-                content_text = build_content(&inputs, true, s);
+                content_text = build_lines(&inputs, true, s);
                 needs_update = false
               });
             }

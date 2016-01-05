@@ -251,3 +251,9 @@ pub fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
 
   (before, ccursor, after)
 }
+
+pub fn build_content(keys: &List<Action>) -> (List<Symbol>,List<Symbol>) {    
+  let (commands, _) = al_to_ub(&keys.rev());
+  let (before, _, after) = cl_to_cz(&commands.rev());    
+  (before, after)
+}
