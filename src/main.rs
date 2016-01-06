@@ -53,13 +53,12 @@ enum Inputstatus {
   EnterCursor(
     Box<Inputstatus>,   // prior input status
     CCs,                // current command in process
-    List<Action>,       // actions generating new cursor
-    String,             // new cursor in progress
+    spec::SpecEditor,         // new cursor in progress
   )
 }
 
-fn build_lines(keys: &List<Action>, addcursor: bool, showcursors: bool) -> List<String> {
-  spec::get_lines(keys, &ViewParams{addcursor: addcursor, showcursors: showcursors})
+fn firstline(l: &List<String>) -> String {
+  l.head().unwrap_or(&"".to_string()).clone()
 }
 
 fn rnd_inputs(num: u32) -> List<Action> {
@@ -126,9 +125,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
 
   for st in t.iter() {
     text.draw(
-      st,
-      f,
-      &c.draw_state,
+      st, f, &c.draw_state,
       c.trans(10.0, loc).transform,
       g); 
     loc += size;
@@ -141,9 +138,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   let (px,py) = (600.0, size*1.5);
   let clock = "Time(ms): ".to_string() + &time.num_milliseconds().to_string();
   text.draw(
-    &clock,
-    f,
-    &c.draw_state,
+    &clock, f, &c.draw_state,
     c.trans(px, py).transform,
     g); 
 
@@ -165,15 +160,11 @@ fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut Glyp
   }.to_string();
 
   text.draw(
-    &prompt,
-    f,
-    &c.draw_state,
+    &prompt, f, &c.draw_state,
     c.trans(px, py).transform,
     g); 
   text.draw(
-    t,
-    f,
-    &c.draw_state,
+    t, f, &c.draw_state,
     c.trans(px + size, py + size*1.5).transform,
     g); 
 }
@@ -197,7 +188,7 @@ fn main() {
     .args_from_usage(
       "-x --width=[width] 'editor width in pixels'
       -y --height=[height] 'editor height in pixels'
-      [fast] -f --fast 'make it fast'")
+      [ref] -r --reference 'disable Adapton optimizations'")
     .subcommand(clap::SubCommand::with_name("test")
       .about("test options")
       .args_from_usage(
@@ -206,17 +197,17 @@ fn main() {
         -s --rnd_start=[rnd_start] 'number of random starting commands'
         -a --rnd_adds=[rnd_adds] 'number of random commands after start'
         [auto_exit] -e --auto_exit 'exit the editor when all random commands are complete'
-        [use_adapton] -f --fast 'make it fast'")
+        [ref] -r --reference 'disable Adapton optimizations'")
     )
     .get_matches();
-  //not the best usage of a subcommand, but ti works
+  //not the best usage of a subcommand, but it works
   let test_args = if let Some(matches) = args.subcommand_matches("test") {matches} else {&args};
   let x = value_t!(test_args.value_of("width"), u32).unwrap_or(DEFAULT_WIDTH);
   let y = value_t!(test_args.value_of("height"), u32).unwrap_or(DEFAULT_HEIGHT);
   let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(DEFAULT_RND_START);
   let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(DEFAULT_RND_ADDITIONS);
   let auto_exit = test_args.is_present("auto_exit");
-  let use_adapton = test_args.is_present("use_adapton");
+  let use_adapton = !test_args.is_present("ref");
 
   //graphics
   let window = try_create_window(x, y).unwrap();
@@ -233,8 +224,8 @@ fn main() {
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
-  if use_adapton { main_edit = Box::new(fast::AdaptEditor::new(rnd_inputs(rnd_start)))}
-    else{ main_edit = Box::new(spec::SpecEditor::new(rnd_inputs(rnd_start)))};
+  if use_adapton { main_edit = Box::new(fast::AdaptEditor::new(rnd_inputs(rnd_start))) }
+    else { main_edit = Box::new(spec::SpecEditor::new(rnd_inputs(rnd_start))) };
 
   for e in window.events().max_fps(60).ups(50) {
     match e {
@@ -250,13 +241,9 @@ fn main() {
             main_edit.take_action(Action::Cmd(Command::Ovr(t,d.clone())));
             Inputstatus::Overwrite(d, s)
           }
-          Inputstatus::EnterCursor(p,c,a,_) => {
-            let a2 = a.append(Action::Cmd(Command::Ins(t,Dir::R)));
-            let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
-            Inputstatus::EnterCursor(
-              p,c,a2,
-              content
-            )
+          Inputstatus::EnterCursor(p,c,mut e @ _) => {
+            e.take_action(Action::Cmd(Command::Ins(t,Dir::R)));
+            Inputstatus::EnterCursor(p,c,e)
           }
         };
         needs_update = true;
@@ -293,8 +280,8 @@ fn main() {
                 Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
                   Inputstatus::Overwrite(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,ct) => {
-                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                Inputstatus::EnterCursor(p,c,a) => {
+                  Inputstatus::EnterCursor(p,c,a)                  
                 }
               };
             } else {
@@ -308,8 +295,8 @@ fn main() {
                 Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
                   Inputstatus::Insert(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,ct) => {
-                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                Inputstatus::EnterCursor(p,c,a) => {
+                  Inputstatus::EnterCursor(p,c,a)                  
                 }
               };
             } else {
@@ -326,8 +313,8 @@ fn main() {
                 Inputstatus::Overwrite(_, s) => {
                   Inputstatus::Overwrite(Dir::L, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,ct) => {
-                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                Inputstatus::EnterCursor(p,c,e) => {
+                  Inputstatus::EnterCursor(p,c,e)                  
                 }
               };
             }
@@ -345,13 +332,9 @@ fn main() {
                   );
                   Inputstatus::Overwrite(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,_) => {
-                  let a2 = a.append(Action::Cmd(Command::Move(Dir::L)));
-                  let content = build_lines(&a2,true,false).head().unwrap_or(&"".to_string()).clone();
-                  Inputstatus::EnterCursor(
-                    p,c,a2,
-                    content
-                  )                  
+                Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                  e.take_action(Action::Cmd(Command::Move(Dir::L)));
+                  Inputstatus::EnterCursor(p,c,e)                  
                 }
               };
               needs_update = true;
@@ -367,8 +350,8 @@ fn main() {
                 Inputstatus::Overwrite(_, s) => {
                   Inputstatus::Overwrite(Dir::R, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,ct) => {
-                  Inputstatus::EnterCursor(p,c,a,ct)                  
+                Inputstatus::EnterCursor(p,c,e) => {
+                  Inputstatus::EnterCursor(p,c,e)                  
                 }
               };
             }
@@ -386,13 +369,9 @@ fn main() {
                   );
                   Inputstatus::Overwrite(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,_) => {
-                  let a2 = a.append(Action::Cmd(Command::Move(Dir::R)));
-                  let content = build_lines(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
-                  Inputstatus::EnterCursor(
-                    p,c,a2,
-                    content
-                  )                  
+                Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                  e.take_action(Action::Cmd(Command::Move(Dir::R)));
+                  Inputstatus::EnterCursor(p,c,e)                  
                 }
               };
               needs_update = true;
@@ -413,13 +392,9 @@ fn main() {
                   );
                   Inputstatus::Overwrite(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,_) => {
-                  let a2 = a.append(Action::Cmd(Command::Rem(Dir::R)));
-                  let content = build_lines(&a2,true, false).head().unwrap_or(&"".to_string()).clone();
-                  Inputstatus::EnterCursor(
-                    p,c,a2,
-                    content
-                  )                  
+                Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                  e.take_action(Action::Cmd(Command::Rem(Dir::R)));
+                  Inputstatus::EnterCursor(p,c,e)                  
                 }
               };
               needs_update = true;
@@ -441,13 +416,9 @@ fn main() {
                   );
                   Inputstatus::Overwrite(d, s) 
                 }
-                Inputstatus::EnterCursor(p,c,a,_) => {
-                  let a2 = a.append(Action::Cmd(Command::Rem(Dir::L)));
-                  let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
-                  Inputstatus::EnterCursor(
-                    p,c,a2,
-                    content
-                  )                  
+                Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                  e.take_action(Action::Cmd(Command::Rem(Dir::L)));
+                  Inputstatus::EnterCursor(p,c,e)                  
                 }
               };
               needs_update = true;
@@ -469,8 +440,8 @@ fn main() {
                   );
                   Inputstatus::Overwrite(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,a,_) => {
-                  let content = build_lines(&a, false, false).head().unwrap_or(&"".to_string()).clone();
+                Inputstatus::EnterCursor(p,c,e) => {
+                  let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}));
                   let newcommand = match c {
                       CCs::Mk => {Command::Mk(content)}
                       CCs::Switch => {Command::Switch(content)}
@@ -491,13 +462,9 @@ fn main() {
                   main_edit.take_action(Action::Undo);
                   status
                 }
-                Inputstatus::EnterCursor(p,cc,a,_) => {
-                  let a2 = a.append(Action::Undo);
-                  let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
-                  Inputstatus::EnterCursor(
-                    p,cc,a2,
-                    content
-                  )
+                Inputstatus::EnterCursor(p,cc,mut e @ _) => {
+                  e.take_action(Action::Undo);
+                  Inputstatus::EnterCursor(p,cc,e)
                 }
               };
               status = newstatus;
@@ -511,13 +478,9 @@ fn main() {
                   main_edit.take_action(Action::Redo);
                   status
                 }
-                Inputstatus::EnterCursor(p,cc,a,_) => {
-                  let a2 = a.append(Action::Redo);
-                  let content = build_lines(&a2, true, false).head().unwrap_or(&"".to_string()).clone();
-                  Inputstatus::EnterCursor(
-                    p,cc,a2,
-                    content
-                  )
+                Inputstatus::EnterCursor(p,cc,mut e @ _) => {
+                  e.take_action(Action::Redo);
+                  Inputstatus::EnterCursor(p,cc,e)
                 }
               };
               status = newstatus;
@@ -528,9 +491,9 @@ fn main() {
             if command_key_down{
                 let newstatus = match status {
                   Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                    Inputstatus::EnterCursor(Box::new(status), CCs::Mk, List::new(), "".to_string())
+                    Inputstatus::EnterCursor(Box::new(status), CCs::Mk, spec::SpecEditor::new(List::new()))
                   }
-                  Inputstatus::EnterCursor(_,_,_,_) => {
+                  Inputstatus::EnterCursor(_,_,_) => {
                     status
                   }
                 };
@@ -542,9 +505,9 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Switch, List::new(), "".to_string())
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Switch, spec::SpecEditor::new(List::new()))
                 }
-                Inputstatus::EnterCursor(_,_,_,_) => {
+                Inputstatus::EnterCursor(_,_,_) => {
                   status
                 }
               };
@@ -556,9 +519,9 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, List::new(), "".to_string())
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, spec::SpecEditor::new(List::new()))
                 }
-                Inputstatus::EnterCursor(_,_,_,_) => {
+                Inputstatus::EnterCursor(_,_,_) => {
                   status
                 }
               };
@@ -570,9 +533,9 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Join, List::new(), "".to_string())
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Join, spec::SpecEditor::new(List::new()))
                 }
-                Inputstatus::EnterCursor(_,_,_,_) => {
+                Inputstatus::EnterCursor(_,_,_) => {
                   status
                 }
               };
@@ -589,8 +552,8 @@ fn main() {
                   Inputstatus::Overwrite(d, s) => {
                     Inputstatus::Overwrite(d, !s)
                   }
-                  Inputstatus::EnterCursor(p,c,a,ct) => {
-                    Inputstatus::EnterCursor(p,c,a,ct)
+                  Inputstatus::EnterCursor(p,c,e) => {
+                    Inputstatus::EnterCursor(p,c,e)
                   }
                 };
                 needs_update = true;
@@ -630,8 +593,9 @@ fn main() {
             }
             gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, time));
           }
-          Inputstatus::EnterCursor(_, ref cc, _, ref ct) => {           
-            gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), ct));
+          Inputstatus::EnterCursor(_, ref cc, ref e) => {
+            let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
+            gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), &ct));
           }
         }
         
