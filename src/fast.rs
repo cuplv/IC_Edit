@@ -71,16 +71,16 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         &|_|      ContentInfo::zero(),
         &|_,leaf| {
             match leaf {
-                Symbol::Cur(cursor)  => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0 },
-                Symbol::Data(ref string) if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1 },
-                Symbol::Data(string) => ContentInfo{ cursors:vec![], data_count:1, line_count:0 },
+                Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0 },
+                Symbol::Data(ref string)
+                    if string == "\n" => ContentInfo{ cursors:vec![],       data_count:0, line_count:1 },
+                Symbol::Data(string)  => ContentInfo{ cursors:vec![],       data_count:1, line_count:0 },
             }
         },
         &|st,  _,l,r| (l + r),
         &|st,_,_,l,r| (l + r),
         )
 }
-
 
 impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     fn take_action(self: &mut Self, ac: Action) -> () {
