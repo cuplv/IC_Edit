@@ -7,6 +7,8 @@ use adapton::adapton_sigs::Adapton;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
 use adapton::collection::List;
+use std::ops::Add;
+use std::num::Zero;
 
 pub struct AdaptEditor<A:Adapton> {
     actions: List<A,Action>
@@ -28,27 +30,53 @@ impl<A:Adapton> AdaptEditor<A> {
   }
 }
 
-struct ContentInfo {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ContentInfo {
     cursors:Vec<Cursor>,
     data_count:usize,
     line_count:usize,
 }
 
-pub fn tree_reduce_monoid<A:Adapton,Elm:Eq+Hash+Clone+Debug,T:TreeT<A,Elm>,BinOp>
-    (st:&mut A, tree:T::Tree, zero:Elm, binop:&BinOp) -> Elm
-    where BinOp:Fn(&mut A, Elm, Elm) -> Elm
-{
-    T::fold_up(st, tree,
-                        &|_| zero.clone(),
-                   &|_,leaf| leaf,
-                 &|st,_,l,r| binop(st,l,r),
-               &|st,_,_,l,r| binop(st,l,r),
-               )
+impl Add for ContentInfo {
+    type Output=ContentInfo;
+    fn add(self, rhs: Self) -> Self::Output {
+        ContentInfo {
+            cursors    : { let mut v = self.cursors.clone() ; v.append( &mut rhs.cursors.clone() ) ; v },
+            data_count : self.data_count + rhs.data_count,
+            line_count : self.line_count + rhs.line_count,
+        }
+    }
+}
+
+impl Zero for ContentInfo {
+    fn zero() -> Self {
+        ContentInfo {
+            cursors    : vec![],
+            data_count : 0,
+            line_count : 0,
+        }
+    }
 }
 
 
 
-
+pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
+    (st:&mut A, tree:T::Tree) -> ContentInfo
+{
+    T::fold_up(
+        st, tree,
+        &|_|      ContentInfo::zero(),
+        &|_,leaf| {
+            match leaf {
+                Symbol::Cur(cursor)  => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0 },
+                Symbol::Data(ref string) if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1 },
+                Symbol::Data(string) => ContentInfo{ cursors:vec![], data_count:1, line_count:0 },
+            }
+        },
+        &|st,  _,l,r| (l + r),
+        &|st,_,_,l,r| (l + r),
+        )
+}
 
 
 impl<A:Adapton> EditorPipeline for AdaptEditor<A> {

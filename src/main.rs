@@ -1,3 +1,5 @@
+#![feature(zero_one)]
+
 // Default parameters
 // ------------------
 
@@ -16,7 +18,6 @@ const DEFAULT_RND_START: u32 = 0000;
 // icedit test -a <Num> / --rnd_adds <Num>
 // nummer of random commands after start
 const DEFAULT_RND_ADDITIONS: u32 = 0;
-
 
 extern crate time;
 extern crate rand;
