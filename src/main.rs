@@ -44,6 +44,8 @@ use piston::input::{Button, Event, Input, Key};
 use piston::window::WindowSettings;
 use functional::List;
 use editor_defs::*;
+use adapton::engine::Engine;
+use adapton::naive::AdaptonFromScratch;
 
 const OPEN_GL: OpenGL = OpenGL::V3_2;
 
@@ -188,7 +190,8 @@ fn main() {
     .args_from_usage(
       "-x --width=[width] 'editor width in pixels'
       -y --height=[height] 'editor height in pixels'
-      [ref] -r --reference 'disable Adapton optimizations'")
+      [ref] -r --reference 'disable Adapton optimizations'
+      [engine] -e --engine 'enable Adapton engine's algorithms'")
     .subcommand(clap::SubCommand::with_name("test")
       .about("test options")
       .args_from_usage(
@@ -196,8 +199,9 @@ fn main() {
         -y --height=[height] 'editor height in pixels'
         -s --rnd_start=[rnd_start] 'number of random starting commands'
         -a --rnd_adds=[rnd_adds] 'number of random commands after start'
-        [auto_exit] -e --auto_exit 'exit the editor when all random commands are complete'
-        [ref] -r --reference 'disable Adapton optimizations'")
+        [auto_exit] -q --auto_exit 'exit the editor when all random commands are complete'
+        [ref] -r --reference 'disable Adapton optimizations'
+        [engine] -e --engine 'enable Adapton engine's algorithms'")
     )
     .get_matches();
   //not the best usage of a subcommand, but it works
@@ -208,6 +212,7 @@ fn main() {
   let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(DEFAULT_RND_ADDITIONS);
   let auto_exit = test_args.is_present("auto_exit");
   let use_adapton = !test_args.is_present("ref");
+  let use_engine = test_args.is_present("engine");
 
   //graphics
   let window = try_create_window(x, y).unwrap();
@@ -224,7 +229,13 @@ fn main() {
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
-  if use_adapton { main_edit = Box::new(fast::AdaptEditor::new(rnd_inputs(rnd_start))) }
+    if use_adapton {
+        if use_engine /* ?? */ {
+            main_edit = Box::new(fast::AdaptEditor::<Engine>::new(rnd_inputs(rnd_start)))
+        } else {
+            main_edit = Box::new(fast::AdaptEditor::<AdaptonFromScratch>::new(rnd_inputs(rnd_start)))
+        }
+    }
     else { main_edit = Box::new(spec::SpecEditor::new(rnd_inputs(rnd_start))) };
 
   for e in window.events().max_fps(60).ups(50) {
