@@ -11,7 +11,7 @@ use std::ops::Add;
 use std::num::Zero;
 
 pub struct AdaptEditor<A:Adapton> {
-    actions: List<A,Action>
+    rev_actions: List<A,Action>
 }
 
 pub fn list_of_list<A:Adapton,L:ListT<A,Action>>
@@ -25,7 +25,7 @@ pub fn list_of_list<A:Adapton,L:ListT<A,Action>>
 impl<A:Adapton> AdaptEditor<A> {
   pub fn new(st: &mut A, initial_actions: functional::List<Action>) -> AdaptEditor<A> {
     AdaptEditor{
-      actions: list_of_list::<A,List<A,Action>>(st, initial_actions)
+        rev_actions: list_of_list::<A,List<A,Action>>(st, initial_actions)
     }
   }
 }
