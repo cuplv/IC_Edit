@@ -232,10 +232,10 @@ fn main() {
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
-  let mut adapton : Engine = Engine::new();
     if use_adapton {
         //if use_engine /* ?? */ {
-            main_edit = Box::new(fast::AdaptEditor::<Engine>::new(&mut adapton, rnd_inputs(rnd_start)))
+            let engine = Engine::new() ;
+            main_edit = Box::new(fast::AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start)))
     //} else {
             //main_edit = Box::new(fast::AdaptEditor::<AdaptonFromScratch>::new(*adapton, rnd_inputs(rnd_start)))
     //}

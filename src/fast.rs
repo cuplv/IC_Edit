@@ -6,12 +6,13 @@ use functional;
 use adapton::adapton_sigs::Adapton;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
-use adapton::collection::List;
+//use adapton::collection::List;
 use std::ops::Add;
 use std::num::Zero;
 
-pub struct AdaptEditor<A:Adapton> {
-    rev_actions: List<A,Action>
+pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
+    adapton_st: A,
+    rev_actions: L::List,
 }
 
 pub fn list_of_list<A:Adapton,L:ListT<A,Action>>
@@ -22,10 +23,12 @@ pub fn list_of_list<A:Adapton,L:ListT<A,Action>>
     return l_out
 }
 
-impl<A:Adapton> AdaptEditor<A> {
-  pub fn new(st: &mut A, initial_actions: functional::List<Action>) -> AdaptEditor<A> {
-    AdaptEditor{
-        rev_actions: list_of_list::<A,List<A,Action>>(st, initial_actions)
+impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
+    pub fn new(mut st: A, initial_actions: functional::List<Action>) -> AdaptEditor<A,L> {
+        let actions = list_of_list::<A,L>(&mut st, initial_actions) ;
+      AdaptEditor{
+        adapton_st: st,
+        rev_actions: actions,
     }
   }
 }
@@ -79,9 +82,11 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
 }
 
 
-impl<A:Adapton> EditorPipeline for AdaptEditor<A> {
+impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     fn take_action(self: &mut Self, ac: Action) -> () {
-        panic!("")
+        // XXX: Kyle and I don't know how to do this without cloning!
+        self.rev_actions =
+            L::cons(&mut self.adapton_st, ac, self.rev_actions.clone())
     }
 
     fn get_lines(self: &Self, vp: &ViewParams) -> functional::List<String> {
