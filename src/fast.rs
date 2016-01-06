@@ -1,8 +1,11 @@
 use editor_defs::*;
+use std::fmt::{Debug};
+use std::hash::{Hash};
 
 use functional;
 use adapton::adapton_sigs::Adapton;
 use adapton::collection_traits::ListT;
+use adapton::collection_traits::TreeT;
 use adapton::collection::List;
 
 pub struct AdaptEditor<A:Adapton> {
@@ -25,17 +28,23 @@ impl<A:Adapton> AdaptEditor<A> {
   }
 }
 
-// pub fn tree_reduce_monoid<A:Adapton,Elm:Eq+Hash+Clone+Debug,T:TreeT<A,Elm>,BinOp>
-//     (st:&mut A, tree:T::Tree, zero:Elm, binop:&BinOp) -> Elm
-//     where BinOp:Fn(&mut A, Elm, Elm) -> Elm
-// {
-//     T::fold_up(st, tree,
-//                         &|_| zero.clone(),
-//                    &|_,leaf| leaf,
-//                  &|st,_,l,r| binop(st,l,r),
-//                &|st,_,_,l,r| binop(st,l,r),
-//                )
-// }
+struct ContentInfo {
+    cursors:Vec<Cursor>,
+    data_count:usize,
+    line_count:usize,
+}
+
+pub fn tree_reduce_monoid<A:Adapton,Elm:Eq+Hash+Clone+Debug,T:TreeT<A,Elm>,BinOp>
+    (st:&mut A, tree:T::Tree, zero:Elm, binop:&BinOp) -> Elm
+    where BinOp:Fn(&mut A, Elm, Elm) -> Elm
+{
+    T::fold_up(st, tree,
+                        &|_| zero.clone(),
+                   &|_,leaf| leaf,
+                 &|st,_,l,r| binop(st,l,r),
+               &|st,_,_,l,r| binop(st,l,r),
+               )
+}
 
 
 
