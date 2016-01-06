@@ -14,7 +14,7 @@ impl SpecEditor {
 }
 
 //Action list to undo buffer
-pub fn al_to_ub(acts: &List<Action>) -> Zip<Command> {
+pub fn undobuff_of_actions(acts: &List<Action>) -> Zip<Command> {
   let mut content: List<Command> = List::new();
   let mut buffer: List<Command> = List::new();
 
@@ -133,7 +133,7 @@ pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>)
 
 
 // command list to content zipper
-pub fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
+pub fn content_of_commands(commands: &List<Command>) -> CZip<Symbol> {
   let mut before: List<Symbol> = List::new();
   let mut ccursor: Cursor = "0".to_string();
   let mut after: List<Symbol> = List::new();
@@ -215,8 +215,8 @@ pub fn cl_to_cz(commands: &List<Command>) -> CZip<Symbol> {
 }
 
 pub fn build_content(keys: &List<Action>) -> (List<Symbol>,List<Symbol>) {    
-  let (commands, _) = al_to_ub(&keys.rev());
-  let (before, _, after) = cl_to_cz(&commands.rev());    
+  let (commands, _) = undobuff_of_actions(&keys.rev());
+  let (before, _, after) = content_of_commands(&commands.rev());    
   (before, after)
 }
 
