@@ -2,7 +2,7 @@ use functional::List;
 
 pub type Cursor = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Dir {
   L,
   R,
@@ -17,20 +17,20 @@ impl Dir {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Symbol {
 	Cur(Cursor),
 	Data(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
   Cmd(Command),
   Undo,
   Redo,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Command {
   Ins(String, Dir),   //Insert <String>, moving cursor <Dir>
   Rem(Dir),           //Remove character located <Dir>
@@ -42,7 +42,7 @@ pub enum Command {
   Join(Cursor),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CCs {
   Mk, Switch, Jmp, Join
 }

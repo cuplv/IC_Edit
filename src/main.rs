@@ -44,6 +44,8 @@ use piston::input::{Button, Event, Input, Key};
 use piston::window::WindowSettings;
 use functional::List;
 use editor_defs::*;
+
+use adapton::adapton_sigs::Adapton;
 use adapton::engine::Engine;
 use adapton::naive::AdaptonFromScratch;
 
@@ -229,12 +231,13 @@ fn main() {
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
+  let mut adapton : Engine = Engine::new();
     if use_adapton {
-        if use_engine /* ?? */ {
-            main_edit = Box::new(fast::AdaptEditor::<Engine>::new(rnd_inputs(rnd_start)))
-        } else {
-            main_edit = Box::new(fast::AdaptEditor::<AdaptonFromScratch>::new(rnd_inputs(rnd_start)))
-        }
+        //if use_engine /* ?? */ {
+            main_edit = Box::new(fast::AdaptEditor::<Engine>::new(&mut adapton, rnd_inputs(rnd_start)))
+    //} else {
+            //main_edit = Box::new(fast::AdaptEditor::<AdaptonFromScratch>::new(*adapton, rnd_inputs(rnd_start)))
+    //}
     }
     else { main_edit = Box::new(spec::SpecEditor::new(rnd_inputs(rnd_start))) };
 
