@@ -99,7 +99,7 @@ pub fn pass_cursors
     <A:Adapton
     ,Symz:ListEdit<A,Symbol>
     >
-    (st: &mut A, dir:Dir2, z:Symz::State) -> Symz::State
+    (st: &mut A, z:Symz::State, dir:Dir2) -> Symz::State
 {        
     let (z, obs) = Symz::observe(st, z, dir.clone()) ;
     match obs {
@@ -107,7 +107,7 @@ pub fn pass_cursors
         Some(Symbol::Data(_)) => { z },                
         Some(Symbol::Cur(_)) => {                
             let (z, success) = Symz::goto(st, z, dir.clone()) ;
-            if success { return pass_cursors::<A,Symz>(st, dir, z) }
+            if success { return pass_cursors::<A,Symz>(st, z, dir) }
             else { z }
         },
     }        
@@ -123,6 +123,13 @@ pub fn content_of_cmdz
         Cmds::fold_lr(
             st, cmds, (emp, None),
             /* Leaf */ &|st, cmd, (z, nm)| {
+                let z = match cmd.clone() {
+                    Command::Ins(_, dir) |
+                    Command::Rem(dir) |
+                    Command::Move(dir) |  
+                    Command::Ovr(_, dir) => pass_cursors::<A,Symz>(st, z, dir2_of_dir(&dir)),
+                    _ => z
+                } ;                
                 let z = match cmd {
                     Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)),
                     Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; z },
