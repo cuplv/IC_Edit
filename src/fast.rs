@@ -84,8 +84,8 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         )
 }
 
-pub fn dir2_of_dir (d:Dir) -> Dir2 {
-    match d {
+pub fn dir2_of_dir (d:&Dir) -> Dir2 {
+    match *d {
         Dir::L => Dir2::Left,
         Dir::R => Dir2::Right,
     }
@@ -102,10 +102,14 @@ pub fn content_of_cmdz
             st, cmds, (emp, None),
             /* Leaf */ &|st, cmd, (z, nm)| {
                 let z = match cmd {
-                    Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(dir), Symbol::Data(data)),
-                    Command::Rem(dir) => z,
-                    Command::Move(dir) => z,
-                    Command::Ovr(data, dir) => z,
+                    Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(&dir), Symbol::Data(data)),
+                    Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; z },
+                    Command::Move(dir)      => { let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ; z },
+                    Command::Ovr(data, dir) => {
+                        let (z, _, _) = Symz::replace(st, z, dir2_of_dir(&dir), Symbol::Data(data)) ;
+                        let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ;
+                        z
+                    },
                     _ => panic!("")
                 } ;
                 (z, nm)
