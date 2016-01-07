@@ -84,10 +84,29 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         )
 }
 
+pub fn content_of_cmdz
+    <A:Adapton
+    ,Cmds:TreeT<A,Command>
+    ,Symz:ListEdit<A,Symbol>
+    >
+    (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>) {
+        let emp = Symz::empty(st);
+        Cmds::fold_lr(
+            st, cmds, (emp, None),
+            /* Leaf */ &|st, cmd, (z, nm)| {
+                panic!("")
+            },
+            /* Bin  */ &|st, _, r| r,
+            /* Name */ &|st, nm2, _, (z,nm1)| match nm1 {
+                None => (z, Some(nm2)),
+                Some(_) => panic!("nominal ambiguity!")
+            },
+            )
+        }
+
 pub fn cmdz_of_actions
     <A:Adapton
     ,Acts:TreeT<A,Action>
-    ,Cmds:ListT<A,Command>
     ,Edit:ListEdit<A,Command>
     >
     (st: &mut A, acts:Acts::Tree)
@@ -98,10 +117,12 @@ pub fn cmdz_of_actions
              /* Leaf */ &|st, act, (z,nm)| {
                  match act {
                      Action::Undo => {
-                         panic!("")
+                         let (z,_) = Edit::goto(st, z, Dir2::Left);
+                         (z,nm)
                      },                         
                      Action::Redo => {
-                         panic!("")
+                         let (z,_) = Edit::goto(st, z, Dir2::Right);
+                         (z,nm)
                      },
                      Action::Cmd(c) => {
                          let z = match nm {
