@@ -95,6 +95,24 @@ pub fn dir2_of_dir (d:&Dir) -> Dir2 {
     }
 }
 
+pub fn pass_cursors
+    <A:Adapton
+    ,Symz:ListEdit<A,Symbol>
+    >
+    (st: &mut A, dir:Dir2, z:Symz::State) -> Symz::State
+{        
+    let (z, obs) = Symz::observe(st, z, dir.clone()) ;
+    match obs {
+        None => z,
+        Some(Symbol::Data(_)) => { z },                
+        Some(Symbol::Cur(_)) => {                
+            let (z, success) = Symz::goto(st, z, dir.clone()) ;
+            if success { return pass_cursors::<A,Symz>(st, dir, z) }
+            else { z }
+        },
+    }        
+}
+    
 pub fn content_of_cmdz
     <A:Adapton
     ,Cmds:TreeT<A,Command>
