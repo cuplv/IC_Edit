@@ -117,38 +117,47 @@ pub fn content_of_cmdz
     <A:Adapton
     ,Cmds:TreeT<A,Command>
     ,Symz:ListEdit<A,Symbol>
+    ,Syms:TreeT<A,Symbol>
     >
-    (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>) {
+    (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>, Cursor) {
         let emp = Symz::empty(st);
         Cmds::fold_lr(
-            st, cmds, (emp, None),
-            /* Leaf */ &|st, cmd, (z, nm)| {
+            st, cmds, (emp, None, "0".to_string()),
+            /* Leaf */ &|st, cmd, (z, nm, active)| {               
+                let tz = {
+                    let z = match cmd.clone() {
+                        Command::Switch(_) => Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
+                        _ => z.clone()
+                    };
+                    Symz::get_tree::<Syms>(st, z, Dir2::Left)
+                } ;                
                 let z = match cmd.clone() {
                     Command::Ins(_, dir) |
                     Command::Rem(dir) |
                     Command::Move(dir) |  
                     Command::Ovr(_, dir) => pass_cursors::<A,Symz>(st, z, dir2_of_dir(&dir)),
                     _ => z
-                } ;                
-                let z = match cmd {
-                    Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)),
-                    Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; z },
-                    Command::Move(dir)      => { let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ; z },
+                } ;
+                let (z, active) = match cmd {
+                    Command::Ins(data, dir) => { let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ; (z, active) }
+                    Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; (z, active) },
+                    Command::Move(dir)      => { let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ; (z, active) },
                     Command::Ovr(data, dir) => {
                         let (z, _, _) = Symz::replace(st, z, dir2_of_dir(&dir), Symbol::Data(data)) ;
                         let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ;
-                        z
+                        (z, active)
                     },
-                    Command::Mk(cursor)     => Symz::insert(st, z, Dir2::Right, Symbol::Cur(cursor)),
+                    Command::Mk(cursor)     => { let z = Symz::insert(st, z, Dir2::Left, Symbol::Cur(cursor)) ; (z, active) },
+                    Command::Join(cursor)   => panic!(""),
+
                     Command::Switch(cursor) => panic!(""),
                     Command::Jmp(cursor)    => panic!(""),
-                    Command::Join(cursor)   => panic!(""),
                 } ;
-                (z, nm)
+                (z, nm, active)
             },
             /* Bin  */ &|st, _, r| r,
-            /* Name */ &|st, nm2, _, (z,nm1)| match nm1 {
-                None => (z, Some(nm2)),
+            /* Name */ &|st, nm2, _, (z,nm1,active)| match nm1 {
+                None => (z, Some(nm2), active),
                 Some(_) => panic!("nominal ambiguity!")
             },
             )
@@ -280,7 +289,10 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
 
         println!("cmdt: {:?}", cmdt);       
         
-        let (content, _) = content_of_cmdz::<A,collection::Tree<A,Command,u32>,ListZipper<A,Symbol,List<A,Symbol>>>(st, cmdt) ;
+        let (content, _, _) = content_of_cmdz::<
+            A,collection::Tree<A,Command,u32>
+            ,ListZipper<A,Symbol,List<A,Symbol>>
+            ,collection::Tree<A,Symbol,u32>>(st, cmdt) ;
 
         println!("content: {:?}", content);
 
