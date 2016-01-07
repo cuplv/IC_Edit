@@ -6,6 +6,8 @@ use functional;
 use adapton::adapton_sigs::Adapton;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
+use adapton::collection_traits::Dir2;
+use adapton::collection_edit::ListEdit;
 //use adapton::collection::List;
 use std::ops::Add;
 use std::num::Zero;
@@ -81,6 +83,43 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         &|st,_,_,l,r| (l + r),
         )
 }
+
+pub fn cmdz_of_actions
+    <A:Adapton
+    ,Acts:TreeT<A,Action>
+    ,Cmds:ListT<A,Command>
+    ,Edit:ListEdit<A,Command>
+    >
+    (st: &mut A, acts:Acts::Tree)
+     -> (Edit::State, Option<A::Name>) {
+         let emp = Edit::empty(st);
+         Acts::fold_lr(
+             st, acts, (emp, None),
+             /* Leaf */ &|st, act, (z,nm)| {
+                 match act {
+                     Action::Undo => {
+                         panic!("")
+                     },                         
+                     Action::Redo => {
+                         panic!("")
+                     },
+                     Action::Cmd(c) => {
+                         let z = match nm {
+                             None => Edit::insert(st, z, Dir2::Left, c),
+                             Some(nm) => {
+                                 // TODO: Use nm
+                                 Edit::insert(st, z, Dir2::Left, c)
+                             }} ;
+                         (z, None)
+                     }
+                 }},
+             /* Bin  */ &|st, _, r| r,
+             /* Name */ &|st, nm2, _, (z,nm1)| match nm1 {
+                 None => (z, Some(nm2)),
+                 Some(_) => panic!("nominal ambiguity!")
+             },
+             )
+     }
 
 impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     fn take_action(self: &mut Self, ac: Action) -> () {
