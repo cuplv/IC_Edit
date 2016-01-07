@@ -106,7 +106,7 @@ pub fn content_of_cmdz
             st, cmds, (emp, None),
             /* Leaf */ &|st, cmd, (z, nm)| {
                 let z = match cmd {
-                    Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(&dir), Symbol::Data(data)),
+                    Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)),
                     Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; z },
                     Command::Move(dir)      => { let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ; z },
                     Command::Ovr(data, dir) => {
@@ -164,9 +164,11 @@ pub fn cmdz_of_actions
              )
      }
 
-impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
+impl<A:Adapton,L:ListT<A,Action>> EditorPipeline
+    for AdaptEditor<A,L> {
     fn take_action(self: &mut Self, ac: Action) -> () {
         // XXX: Kyle and I don't know how to do this without cloning!
+        println!("take_action: {:?}", ac);
         self.rev_actions =
             L::cons(&mut self.adapton_st, ac, self.rev_actions.clone())
     }
@@ -195,10 +197,10 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
         let (_, r) = ListZipper::observe(st, content, Dir2::Right) ;
         let l = match l {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
         let r = match r {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
-        let out = functional::List::new() ;
-        let out = out.append(l) ;
-        let out = out.append("_".to_string()) ;
+        let out = functional::List::new() ;        
         let out = out.append(r) ;
+        let out = out.append("_".to_string()) ;
+        let out = out.append(l) ;
         out
     }
 }

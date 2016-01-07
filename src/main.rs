@@ -33,6 +33,7 @@ mod functional;
 mod editor_defs;
 mod spec;
 mod fast;
+mod verifeditor;
 
 use std::env::current_exe;
 use time::Duration;
@@ -193,6 +194,7 @@ fn main() {
     .args_from_usage(
       "-x --width=[width] 'editor width in pixels'
       -y --height=[height] 'editor height in pixels'
+      [verif] -v --verify 'verify engine against spec; run both'
       [ref] -r --reference 'disable Adapton optimizations'
       [engine] -e --engine 'enable Adapton engine's algorithms'")
     .subcommand(clap::SubCommand::with_name("test")
@@ -203,6 +205,7 @@ fn main() {
         -s --rnd_start=[rnd_start] 'number of random starting commands'
         -a --rnd_adds=[rnd_adds] 'number of random commands after start'
         [auto_exit] -q --auto_exit 'exit the editor when all random commands are complete'
+        [verif] -v --verify 'verify engine against spec; run both'
         [ref] -r --reference 'disable Adapton optimizations'
         [engine] -e --engine 'enable Adapton engine's algorithms'")
     )
@@ -215,6 +218,7 @@ fn main() {
   let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(DEFAULT_RND_ADDITIONS);
   let auto_exit = test_args.is_present("auto_exit");
   let use_adapton = !test_args.is_present("ref");
+  let use_verif = test_args.is_present("verif");
   let use_engine = test_args.is_present("engine");
 
   //graphics
@@ -232,7 +236,13 @@ fn main() {
   let more_inputs = rnd_inputs(rnd_adds);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
-    if use_adapton {
+    if use_verif {
+         let engine = Engine::new() ;
+        //main_edit = Box::new(fast::AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start)))
+        main_edit = Box::new(verifeditor::VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start) ) )
+
+    }
+    else if use_adapton {
         //if use_engine /* ?? */ {
             let engine = Engine::new() ;
             main_edit = Box::new(fast::AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start)))

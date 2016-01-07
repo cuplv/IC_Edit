@@ -4,12 +4,14 @@
 
 use std::rc::Rc;
 
+#[derive(PartialEq,Eq)]
 pub struct List<T> {
   head: Link<T>,
 }
 
 type Link<T> = Option<Rc<Node<T>>>;
 
+#[derive(PartialEq,Eq)]
 struct Node<T> {
   elem: T,
   next: Link<T>,
