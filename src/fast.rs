@@ -164,15 +164,78 @@ pub fn cmdz_of_actions
              )
      }
 
-impl<A:Adapton,L:ListT<A,Action>> EditorPipeline
-    for AdaptEditor<A,L> {
+fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
+                         symz:ListZipper<A,Symbol,List<A,Symbol>>) -> functional::List<String> {
+    
+    let mut out_lines = functional::List::new() ;
+    let mut cur_line  = "".to_string() ;
+
+    let mut z = symz.clone() ;
+    
+    let mut line_count = 0;
+    loop {
+        let (z_, x) = ListZipper::remove(st, z, Dir2::Right) ;
+        z = z_ ;
+        match x {
+            None => { break },
+            Some(Symbol::Cur(ref c)) => {
+                if vp.showcursors {cur_line = cur_line + "<" + &c + ">"}
+            }
+            Some(Symbol::Data(ref d)) => {
+                if d == "\n" {
+                    out_lines = out_lines.append(cur_line);
+                    cur_line = "".to_string();
+                    line_count += 1;
+                    if line_count == 40 { break }
+                } else {cur_line = cur_line + &d}
+            }
+        }
+    }
+    
+    out_lines = out_lines.append(cur_line).rev() ;
+    
+    { /* Set up cur_line for next loop; add cursor, if applicable. */
+        let cur = if vp.addcursor {"|"} else {""};
+        match out_lines.head() {
+            None    => {cur_line = cur.to_string()    ;}
+            Some(t) => {cur_line = cur.to_string() + t;}
+        }
+        out_lines = out_lines.tail();
+    }
+
+    loop {
+        let (z_, x) = ListZipper::remove(st, z, Dir2::Left) ;
+        z = z_ ;
+        match x {
+            None => { break },
+            Some(Symbol::Cur(ref c)) => {
+                if vp.showcursors {cur_line = cur_line + "<" + &c + ">"}
+            }
+            Some(Symbol::Data(ref d)) => {
+                if d == "\n" {
+                    out_lines = out_lines.append(cur_line);
+                    cur_line = "".to_string();
+                    line_count += 1;
+                    if line_count == 20 { break }
+                } else {cur_line = d.clone() + &cur_line}
+            }
+        }
+    }
+
+    out_lines = out_lines.append(cur_line) ;
+
+    out_lines
+}
+
+impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     fn take_action(self: &mut Self, ac: Action) -> () {
         // XXX: Kyle and I don't know how to do this without cloning!
         println!("take_action: {:?}", ac);
         self.rev_actions =
             L::cons(&mut self.adapton_st, ac, self.rev_actions.clone())
     }
-
+    
+//   fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<functional::List<Color,String>> {
     fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<String> {
         println!("-----");
         
@@ -192,16 +255,21 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline
         let (content, _) = content_of_cmdz::<A,collection::Tree<A,Command,u32>,ListZipper<A,Symbol,List<A,Symbol>>>(st, cmdt) ;
 
         println!("content: {:?}", content);
-        
-        let (_, l) = ListZipper::observe(st, content.clone(), Dir2::Left) ;
-        let (_, r) = ListZipper::observe(st, content, Dir2::Right) ;
-        let l = match l {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
-        let r = match r {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
-        let out = functional::List::new() ;        
-        let out = out.append(r) ;
-        let out = out.append("_".to_string()) ;
-        let out = out.append(l) ;
-        out
+
+        if false {
+            let (_, l) = ListZipper::observe(st, content.clone(), Dir2::Left) ;
+            let (_, r) = ListZipper::observe(st, content, Dir2::Right) ;
+            let l = match l {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
+            let r = match r {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
+            let out = functional::List::new() ;
+            let out = out.append(r) ;
+            let out = out.append("_".to_string()) ;
+            let out = out.append(l) ;
+            out
+        }
+        else {
+            make_lines(st, vp, content)
+        }
     }
 }
 
