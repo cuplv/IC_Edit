@@ -166,7 +166,7 @@ pub fn cmdz_of_actions
 
 fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
                          symz:ListZipper<A,Symbol,List<A,Symbol>>) -> functional::List<String> {
-    
+    let (max_lines_before, max_lines_after) = (40, 20) ;
     let mut out_lines = functional::List::new() ;
     let mut cur_line  = "".to_string() ;
 
@@ -186,12 +186,12 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
                     out_lines = out_lines.append(cur_line);
                     cur_line = "".to_string();
                     line_count += 1;
-                    if line_count == 40 { break }
+                    if line_count == max_lines_before { break }
                 } else {cur_line = cur_line + &d}
             }
         }
     }
-    
+    line_count = 0 ;
     out_lines = out_lines.append(cur_line).rev() ;
     
     { /* Set up cur_line for next loop; add cursor, if applicable. */
@@ -216,7 +216,7 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
                     out_lines = out_lines.append(cur_line);
                     cur_line = "".to_string();
                     line_count += 1;
-                    if line_count == 20 { break }
+                    if line_count == max_lines_after { break }
                 } else {cur_line = d.clone() + &cur_line}
             }
         }

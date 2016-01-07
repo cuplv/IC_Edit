@@ -223,7 +223,8 @@ pub fn build_content(keys: &List<Action>) -> (List<Symbol>,List<Symbol>) {
 pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
-  let mut count = 40; //HACK: draw off the screen sometimes to make sure the screen is full
+  let (max_lines_before, max_lines_after) = (40, 20) ;
+  let mut count = max_lines_before; //HACK: draw off the screen sometimes to make sure the screen is full
 
   for s in after.iter() {
     match *s {
@@ -250,7 +251,7 @@ pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, show
   }
   out = out.tail();
 
-  count = 20; //cursor no lower than half screen
+  count = max_lines_after; //cursor no lower than half screen
   for s in before.iter() {
     match *s {
       Symbol::Cur(ref c) => {

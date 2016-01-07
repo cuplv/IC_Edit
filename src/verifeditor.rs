@@ -31,7 +31,9 @@ impl<A:Adapton,L:ListT<A,Action>>
     fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String> {
         let lines_spec = self.spec.get_lines(vp.clone());
         let lines_fast = self.fast.get_lines(vp);
-        assert!( &lines_spec == &lines_fast ) ;
+        if !( &lines_spec == &lines_fast ) {
+            panic!("Not equal!\nspec: {:?}\nfast: {:?}", lines_spec, lines_fast )
+        }
         lines_fast        
     }
 }
