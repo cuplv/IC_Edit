@@ -455,7 +455,7 @@ fn main() {
                   );
                   Inputstatus::Overwrite(d, s)
                 }
-                Inputstatus::EnterCursor(p,c,e) => {
+                Inputstatus::EnterCursor(p,c,mut e @ _) => {
                   let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}));
                   let newcommand = match c {
                       CCs::Mk => {Command::Mk(content)}
@@ -608,7 +608,7 @@ fn main() {
             }
             gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, time));
           }
-          Inputstatus::EnterCursor(_, ref cc, ref e) => {
+          Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
             let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
             gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), &ct));
           }

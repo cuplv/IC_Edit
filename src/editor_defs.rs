@@ -59,5 +59,5 @@ pub struct ViewParams {
 
 pub trait EditorPipeline {
     fn take_action(self: &mut Self, ac: Action) -> ();
-    fn get_lines(self: &Self, vp: &ViewParams) -> List<String>;
+    fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String>;
 }

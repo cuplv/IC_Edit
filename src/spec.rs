@@ -276,7 +276,7 @@ impl EditorPipeline for SpecEditor {
       self.actions = self.actions.append(ac);
     }
 
-    fn get_lines(self: &Self, vp: &ViewParams) -> List<String> {
+    fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String> {
       let (before, after) = build_content(&self.actions);
       makelines(&before, &after, vp.addcursor, vp.showcursors)
     }
