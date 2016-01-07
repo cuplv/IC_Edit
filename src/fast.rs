@@ -67,7 +67,37 @@ impl Zero for ContentInfo {
     }
 }
 
-
+pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol>>
+    (st:&mut A, tree:T::Tree, cur:Cursor) -> Option<Symz::State> {
+        T::elim_move
+            (st, tree, cur,
+             /* Empty */ |st, cur| None,
+             /* Leaf */  |st, sym, cur| match sym {
+                 Symbol::Cur(ref c) if c == &cur => { None  /* XXX */ },
+                 _ => None,
+             },
+             /* Bin */ |st, _, l, r, cur| {
+                 let li = tree_info::<A,T>(st, l.clone()) ;
+                 let ri = tree_info::<A,T>(st, r.clone()) ;
+                 if li.cursors.contains( &cur )
+                 { return tree_focus::<A,T,Symz>(st, l, cur) }
+                 else if ri.cursors.contains( &cur )
+                 { return tree_focus::<A,T,Symz>(st, r, cur) }
+                 else
+                 { None }
+             },
+             /* Name */ |st, _, _, l, r, cur| {
+                 let li = tree_info::<A,T>(st, l.clone()) ;
+                 let ri = tree_info::<A,T>(st, r.clone()) ;
+                 if li.cursors.contains( &cur )
+                 { return tree_focus::<A,T,Symz>(st, l, cur) }
+                 else if ri.cursors.contains( &cur )
+                 { return tree_focus::<A,T,Symz>(st, r, cur) }
+                 else
+                 { None }
+             }
+             )
+    }
 
 pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
     (st:&mut A, tree:T::Tree) -> ContentInfo
@@ -130,7 +160,8 @@ pub fn content_of_cmdz
                         _ => z.clone()
                     };
                     Symz::get_tree::<Syms>(st, z, Dir2::Left)
-                } ;                
+                } ;
+                let info = tree_info::<A,Syms> (st, tz.clone() ) ;
                 let z = match cmd.clone() {
                     Command::Ins(_, dir) |
                     Command::Rem(dir) |
