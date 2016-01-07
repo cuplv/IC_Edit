@@ -172,14 +172,34 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     }
 
     fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<String> {
+        println!("-----");
+        
         let st = &mut self.adapton_st ;
+       
         let acts = self.rev_actions.clone() ;
-        let actions = tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Left, acts) ;
+        let actions = tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts) ;
+
+        println!("actions: {:?}", actions);
+
         let (cmdz, _) = cmdz_of_actions::<A,collection::Tree<A,Action,u32>,ListZipper<A,Command,List<A,Command>>> (st, actions) ;
         let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;
         let cmdt = ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left) ;
+
+        println!("cmdt: {:?}", cmdt);       
+        
         let (content, _) = content_of_cmdz::<A,collection::Tree<A,Command,u32>,ListZipper<A,Symbol,List<A,Symbol>>>(st, cmdt) ;
-        panic!("")
+
+        println!("content: {:?}", content);
+        
+        let (_, l) = ListZipper::observe(st, content.clone(), Dir2::Left) ;
+        let (_, r) = ListZipper::observe(st, content, Dir2::Right) ;
+        let l = match l {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
+        let r = match r {Some(Symbol::Data(s))=>s, _=>"".to_string()} ;
+        let out = functional::List::new() ;
+        let out = out.append(l) ;
+        let out = out.append("_".to_string()) ;
+        let out = out.append(r) ;
+        out
     }
 }
 
