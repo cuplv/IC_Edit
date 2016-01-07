@@ -114,7 +114,10 @@ pub fn content_of_cmdz
                         let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ;
                         z
                     },
-                    _ => panic!("")
+                    Command::Mk(cursor)     => Symz::insert(st, z, Dir2::Right, Symbol::Cur(cursor)),
+                    Command::Switch(cursor) => panic!(""),
+                    Command::Jmp(cursor)    => panic!(""),
+                    Command::Join(cursor)   => panic!(""),
                 } ;
                 (z, nm)
             },
