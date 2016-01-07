@@ -84,6 +84,13 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         )
 }
 
+pub fn dir2_of_dir (d:Dir) -> Dir2 {
+    match d {
+        Dir::L => Dir2::Left,
+        Dir::R => Dir2::Right,
+    }
+}
+
 pub fn content_of_cmdz
     <A:Adapton
     ,Cmds:TreeT<A,Command>
@@ -94,7 +101,14 @@ pub fn content_of_cmdz
         Cmds::fold_lr(
             st, cmds, (emp, None),
             /* Leaf */ &|st, cmd, (z, nm)| {
-                panic!("")
+                let z = match cmd {
+                    Command::Ins(data, dir) => Symz::insert(st, z, dir2_of_dir(dir), Symbol::Data(data)),
+                    Command::Rem(dir) => z,
+                    Command::Move(dir) => z,
+                    Command::Ovr(data, dir) => z,
+                    _ => panic!("")
+                } ;
+                (z, nm)
             },
             /* Bin  */ &|st, _, r| r,
             /* Name */ &|st, nm2, _, (z,nm1)| match nm1 {

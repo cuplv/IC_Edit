@@ -8,6 +8,8 @@ pub enum Dir {
   R,
 }
 
+//type Dir = Dir2
+
 impl Dir {
   pub fn opp(&self) -> Dir {
     match *self {
