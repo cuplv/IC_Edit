@@ -68,31 +68,43 @@ impl Zero for ContentInfo {
 }
 
 pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol>>
-    (st:&mut A, tree:T::Tree, cur:Cursor) -> Option<Symz::State> {
+    (st:&mut A, tree:T::Tree, cur:Cursor, symz:Symz::State) -> Option<Symz::State> {
         T::elim_move
-            (st, tree, cur,
-             /* Empty */ |st, cur| None,
-             /* Leaf */  |st, sym, cur| match sym {
+            (st, tree, (cur, symz),
+             /* Empty */ |st, (cur, symz)| None,
+             /* Leaf */  |st, sym, (cur, symz)| match sym {
                  Symbol::Cur(ref c) if c == &cur => { None  /* XXX */ },
                  _ => None,
              },
-             /* Bin */ |st, _, l, r, cur| {
+             /* Bin */ |st, _, l, r, (cur, symz)| {
                  let li = tree_info::<A,T>(st, l.clone()) ;
                  let ri = tree_info::<A,T>(st, r.clone()) ;
                  if li.cursors.contains( &cur )
-                 { return tree_focus::<A,T,Symz>(st, l, cur) }
+                 {
+                     let symz = Symz::insert_tree(st, symz, Dir2::Right, r);
+                     return tree_focus::<A,T,Symz>(st, l, cur, symz)
+                 }
                  else if ri.cursors.contains( &cur )
-                 { return tree_focus::<A,T,Symz>(st, r, cur) }
+                 {
+                     let symz = Symz::insert_tree(st, symz, Dir2::Left, l);
+                     return tree_focus::<A,T,Symz>(st, r, cur, symz)
+                 }
                  else
                  { None }
              },
-             /* Name */ |st, _, _, l, r, cur| {
+             /* Name */ |st, _, _, l, r, (cur, symz)| {
                  let li = tree_info::<A,T>(st, l.clone()) ;
                  let ri = tree_info::<A,T>(st, r.clone()) ;
                  if li.cursors.contains( &cur )
-                 { return tree_focus::<A,T,Symz>(st, l, cur) }
+                 {
+                     let symz = Symz::insert_tree(st, symz, Dir2::Right, r);
+                     return tree_focus::<A,T,Symz>(st, l, cur, symz)
+                 }
                  else if ri.cursors.contains( &cur )
-                 { return tree_focus::<A,T,Symz>(st, r, cur) }
+                 {
+                     let symz = Symz::insert_tree(st, symz, Dir2::Left, l);
+                     return tree_focus::<A,T,Symz>(st, r, cur, symz)
+                 }
                  else
                  { None }
              }
@@ -153,10 +165,11 @@ pub fn content_of_cmdz
         let emp = Symz::empty(st);
         Cmds::fold_lr(
             st, cmds, (emp, None, "0".to_string()),
-            /* Leaf */ &|st, cmd, (z, nm, active)| {               
+            /* Leaf */ &|st, cmd, (z, nm, active) | {
                 let tz = {
                     let z = match cmd.clone() {
-                        Command::Switch(_) => Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
+                        Command::Switch(_) =>
+                            Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
                         _ => z.clone()
                     };
                     Symz::get_tree::<Syms>(st, z, Dir2::Left)
@@ -179,10 +192,33 @@ pub fn content_of_cmdz
                         (z, active)
                     },
                     Command::Mk(cursor)     => { let z = Symz::insert(st, z, Dir2::Left, Symbol::Cur(cursor)) ; (z, active) },
-                    Command::Join(cursor)   => panic!(""),
 
-                    Command::Switch(cursor) => panic!(""),
-                    Command::Jmp(cursor)    => panic!(""),
+                    Command::Join(cursor)   => { let z_new = Symz::empty(st);
+                                                 let z_new = tree_focus(st, tz, cursor, z_new) ;
+                                                 match z_new {
+                                                     None => (z, active),
+                                                     Some(z) => (z, cursor),
+                                                 }}
+
+                    Command::Switch(cursor) => { let z_new = Symz::empty(st);
+                                                 let z_new = tree_focus(st, tz, cursor, z_new) ;
+                                                 match z_new {
+                                                     None => {
+                                                         let (z, _) = Symz::remove(st, z, Dir2::Left);
+                                                         (z, active)
+                                                     }
+                                                     Some(z) => (z, cursor),
+                                                 }}
+
+                    Command::Jmp(cursor)    => { let z_new = Symz::empty(st);
+                                                 let z_new = tree_focus(st, tz, cursor, z_new) ;
+                                                 match z_new {
+                                                     None => (z, active),
+                                                     Some(z) => {
+                                                         let z = Symz::insert(st, z, Dir2::Left, Symbol::Cur(cursor));
+                                                         (z, active)
+                                                     }
+                                                 }}
                 } ;
                 (z, nm, active)
             },
@@ -298,6 +334,7 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
 impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     fn take_action(self: &mut Self, ac: Action) -> () {
         // XXX: Kyle and I don't know how to do this without cloning!
+        // TODO: Need to insert names and articulations into this list
         println!("take_action: {:?}", ac);
         self.rev_actions =
             L::cons(&mut self.adapton_st, ac, self.rev_actions.clone())
@@ -343,5 +380,3 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
         }
     }
 }
-
-
