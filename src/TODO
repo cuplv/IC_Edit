@@ -1,1 +1,7 @@
-viewparams to get "line_count_before" "line_count_after"
+viewparams window size ("line_count_before" "line_count_after")
+fast:: additional cursors not placed correctly in output
+remove debug info
+blinking cursor, and colors
+more stats on screen
+csv output for testing
+ctrl-q to quit, free up esc key

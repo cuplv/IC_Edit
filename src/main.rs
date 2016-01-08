@@ -105,12 +105,12 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
 
   let mut rnd_action = |rng: &mut ThreadRng|{//(&rng: Rng) -> Action {
     match rng.gen_range(0, 100) {
-      0 ... 17 => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
-      18 ... 62 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
-      63 ... 80 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
-      61 ... 98 => {Action::Cmd(Command::Move(rnd_dir(rng)))}
+      0 ... 19 => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
+      20 ... 69 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
+      70 ... 79 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
+      80 ... 98 => {Action::Cmd(Command::Move(rnd_dir(rng)))}
       _ => {
-        let r = if nc {10} else {rng.gen_range(0, 3)};
+        let r = if nc {10} else {rng.gen_range(0, 5)};
         match r {
           0 => {
             cursor_count = cursor_count + 1;
