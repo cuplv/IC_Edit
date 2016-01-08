@@ -11,13 +11,17 @@ const DEFAULT_WIDTH: u32 = 800;
 // Height in pixels
 const DEFAULT_HEIGHT: u32 = 800;
 
-// icedit test -s <Num> / --rnd_start <Num>
-// number of random starting commands
-const DEFAULT_RND_START: u32 = 0000;
+// icedit -r / --reference
+// uses spec implementation without optimisations
+const DISABLE_ADAPTON: bool = false;
 
-// icedit test -a <Num> / --rnd_adds <Num>
-// nummer of random commands after start
-const DEFAULT_RND_ADDITIONS: u32 = 0;
+// icedit test
+//see main() for full testing options
+const TEST_WIDTH: u32 = 800;
+const TEST_HEIGHT: u32 = 800;
+const DEFAULT_RND_START: u32 = 100;
+const DEFAULT_RND_CMDS: u32 = 10;
+const DEFAULT_OUTFILE: Option<&'static str> = Some("testout.csv");
 
 extern crate time;
 extern crate rand;
@@ -44,8 +48,11 @@ use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
 use piston::input::{Button, Event, Input, Key};
 use piston::window::WindowSettings;
-use functional::List;
 use editor_defs::*;
+use functional::List;
+use spec::SpecEditor;
+use fast::AdaptEditor;
+use verifeditor::VerifEditor;
 
 use adapton::adapton_sigs::Adapton;
 use adapton::engine::Engine;
@@ -59,7 +66,7 @@ enum Inputstatus {
   EnterCursor(
     Box<Inputstatus>,   // prior input status
     CCs,                // current command in process
-    spec::SpecEditor,         // new cursor in progress
+    SpecEditor,         // new cursor in progress
   )
 }
 
@@ -67,13 +74,14 @@ fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
 }
 
-fn rnd_inputs(num: u32) -> List<Action> {
+fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
   use rand::{Rng, ThreadRng, thread_rng};
   let mut rng = thread_rng();
   let mut cursor_count = 1;
   let mut acts = List::new();
 
   fn rnd_cursor(rng: &mut ThreadRng) -> Cursor {
+    //TODO: use all possible cursors
     let rn: u8 = rng.gen_range(48,58); //numbers
     String::from_utf8(vec![rn]).unwrap()
   }
@@ -101,14 +109,17 @@ fn rnd_inputs(num: u32) -> List<Action> {
       18 ... 62 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
       63 ... 80 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
       61 ... 98 => {Action::Cmd(Command::Move(rnd_dir(rng)))}
-      _ => match rng.gen_range(0, 3) {
-        0 => {
-          cursor_count = cursor_count + 1;
-          Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
+      _ => {
+        let r = if nc {10} else {rng.gen_range(0, 3)};
+        match r {
+          0 => {
+            cursor_count = cursor_count + 1;
+            Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
+          }
+          1 => {Action::Cmd(Command::Switch(rnd_cursor(rng)))}
+          2 => {Action::Cmd(Command::Jmp(rnd_cursor(rng)))}
+          _ => {Action::Undo}
         }
-        1 => {Action::Cmd(Command::Switch(rnd_cursor(rng)))}
-        2 => {Action::Cmd(Command::Jmp(rnd_cursor(rng)))}
-        _ => {Action::Undo}
       }
     }
   };
@@ -122,8 +133,7 @@ fn rnd_inputs(num: u32) -> List<Action> {
 fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: Duration) {
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
-  //println!("{:?}", &t);
-
+  //main text
   let size = 22.0;
   let mut text = graphics::Text::new(22);
   text.color = [1.0, 1.0, 1.0, 1.0];
@@ -138,6 +148,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
     if loc > 800.0 {break}
   }
 
+  //info section
   let size = 16.0;
   let mut text = graphics::Text::new(16);
   text.color = [1.0, 0.0, 0.0, 1.0];
@@ -153,7 +164,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
 fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, cc:CCs, t: &String) {
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
-  //println!("{:?}", &t);
+  //choose title
   let size = 48.0;
   let mut text = graphics::Text::new(48);
   text.color = [1.0, 1.0, 1.0, 1.0];
@@ -165,6 +176,7 @@ fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut Glyp
     CCs::Join => {"Join with cursor: "}
   }.to_string();
 
+  //render screen
   text.draw(
     &prompt, f, &c.draw_state,
     c.trans(px, py).transform,
@@ -191,35 +203,44 @@ fn main() {
     .version("0.2")
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .about("Incremental Text Editor")
-    .args_from_usage(
-      "-x --width=[width] 'editor width in pixels'
-      -y --height=[height] 'editor height in pixels'
-      [verif] -v --verify 'verify engine against spec; run both'
-      [ref] -r --reference 'disable Adapton optimizations'
-      [engine] -e --engine 'enable Adapton engine's algorithms'")
+    .args_from_usage("\
+      -x --width=[width]              'initial editor width in pixels'
+      -y --height=[height]            'initial editor height in pixels'
+      -s --rnd_start=[rnd_start]      'number of random starting commands'
+      -c --rnd_cmds=[rnd_cmds]        'number of random commands after start'
+      [spec_only] -r --reference      'disable Adapton optimizations' ")
     .subcommand(clap::SubCommand::with_name("test")
       .about("test options")
-      .args_from_usage(
-        "-x --width=[width] 'editor width in pixels'
-        -y --height=[height] 'editor height in pixels'
-        -s --rnd_start=[rnd_start] 'number of random starting commands'
-        -a --rnd_adds=[rnd_adds] 'number of random commands after start'
-        [auto_exit] -q --auto_exit 'exit the editor when all random commands are complete'
-        [verif] -v --verify 'verify engine against spec; run both'
-        [ref] -r --reference 'disable Adapton optimizations'
-        [engine] -e --engine 'enable Adapton engine's algorithms'")
+      .args_from_usage("\
+        -x --width=[width]            'editor width in pixels'
+        -y --height=[height]          'editor height in pixels'
+        -s --rnd_start=[rnd_start]    'number of random starting commands'
+        -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
+        -f --outfile=[outfile]        'filename for testing output'
+        [no_cursors] -n --no_cursors  'do not use cursors in random commands'
+        [spec_only] -r --reference    'only test reference implementation'
+        [fast_only] -a --adapton      'only test adapton implementation'
+        [keep_open] -o --keep_open    'do not exit the editor when testing is complete' ")
     )
     .get_matches();
-  //not the best usage of a subcommand, but it works
-  let test_args = if let Some(matches) = args.subcommand_matches("test") {matches} else {&args};
-  let x = value_t!(test_args.value_of("width"), u32).unwrap_or(DEFAULT_WIDTH);
-  let y = value_t!(test_args.value_of("height"), u32).unwrap_or(DEFAULT_HEIGHT);
-  let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(DEFAULT_RND_START);
-  let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(DEFAULT_RND_ADDITIONS);
-  let auto_exit = test_args.is_present("auto_exit");
-  let use_adapton = !test_args.is_present("ref");
-  let use_verif = test_args.is_present("verif");
-  let use_engine = test_args.is_present("engine");
+  let mut test;
+  let test_args =
+    if let Some(matches) = args.subcommand_matches("test") {
+      test = true; matches
+    } else {
+      test = false; &args
+    };
+  let x = value_t!(test_args.value_of("width"), u32).unwrap_or(if test {TEST_WIDTH} else {DEFAULT_WIDTH});
+  let y = value_t!(test_args.value_of("height"), u32).unwrap_or(if test {TEST_HEIGHT} else {DEFAULT_HEIGHT});
+  let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(if test {DEFAULT_RND_START} else {0});
+  let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(if test {DEFAULT_RND_CMDS} else {0});
+  let keep_open = if test {test_args.is_present("keep_open")} else {true};
+  let no_cursors = test_args.is_present("no_cursors");
+  let use_adapton = !test_args.is_present("spec_only");
+  let use_spec = !test_args.is_present("fast_only");
+  let outfile = test_args.value_of("outfile");
+  //TODO: the clap library supports this in param parsing
+  //assert_eq!(use_adapton || use_spec, true);
 
   //graphics
   let window = try_create_window(x, y).unwrap();
@@ -233,24 +254,18 @@ fn main() {
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
-  let more_inputs = rnd_inputs(rnd_adds);
+  let more_inputs = rnd_inputs(rnd_adds, no_cursors);
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
-    if use_verif {
-         let engine = Engine::new() ;
-        //main_edit = Box::new(fast::AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start)))
-        main_edit = Box::new(verifeditor::VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start) ) )
 
-    }
-    else if use_adapton {
-        //if use_engine /* ?? */ {
-            let engine = Engine::new() ;
-            main_edit = Box::new(fast::AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(engine, rnd_inputs(rnd_start)))
-    //} else {
-            //main_edit = Box::new(fast::AdaptEditor::<AdaptonFromScratch>::new(*adapton, rnd_inputs(rnd_start)))
-    //}
-    }
-    else { main_edit = Box::new(spec::SpecEditor::new(rnd_inputs(rnd_start))) };
+  //select editor  
+  if use_adapton && use_spec {
+    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors) ) )
+  } else if use_adapton {
+    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
+  } else {
+    main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, no_cursors)));
+  }
 
   for e in window.events().max_fps(60).ups(50) {
     match e {
@@ -516,7 +531,7 @@ fn main() {
             if command_key_down{
                 let newstatus = match status {
                   Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                    Inputstatus::EnterCursor(Box::new(status), CCs::Mk, spec::SpecEditor::new(List::new()))
+                    Inputstatus::EnterCursor(Box::new(status), CCs::Mk, SpecEditor::new(List::new()))
                   }
                   Inputstatus::EnterCursor(_,_,_) => {
                     status
@@ -530,7 +545,7 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Switch, spec::SpecEditor::new(List::new()))
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Switch, SpecEditor::new(List::new()))
                 }
                 Inputstatus::EnterCursor(_,_,_) => {
                   status
@@ -544,7 +559,7 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, spec::SpecEditor::new(List::new()))
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, SpecEditor::new(List::new()))
                 }
                 Inputstatus::EnterCursor(_,_,_) => {
                   status
@@ -558,7 +573,7 @@ fn main() {
             if command_key_down {
               let newstatus = match status {
                 Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Join, spec::SpecEditor::new(List::new()))
+                  Inputstatus::EnterCursor(Box::new(status), CCs::Join, SpecEditor::new(List::new()))
                 }
                 Inputstatus::EnterCursor(_,_,_) => {
                   status
@@ -599,7 +614,7 @@ fn main() {
               needs_update = true;
             }
             None => {
-              if auto_exit {break}
+              if !keep_open {break}
             }
           }
         }
