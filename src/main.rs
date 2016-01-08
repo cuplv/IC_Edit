@@ -80,11 +80,10 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
   let mut cursor_count = 1;
   let mut acts = List::new();
 
-  fn rnd_cursor(rng: &mut ThreadRng) -> Cursor {
-    //TODO: use all possible cursors
-    let rn: u8 = rng.gen_range(48,58); //numbers
-    String::from_utf8(vec![rn]).unwrap()
-  }
+  fn rnd_cursor(rng: &mut ThreadRng, max_cursor: u32) -> Cursor {
+    let rn: u32 = rng.gen_range(0, max_cursor);
+    rn.to_string()
+  };
 
   fn rnd_char(rng: &mut ThreadRng) -> String {
     let ascii: u8 = match rng.gen_range(0, 20) {
@@ -100,7 +99,7 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
   }
 
   fn rnd_dir(rng: &mut ThreadRng) -> Dir {
-    if rng.gen() {Dir::R} else {Dir::L}
+    if rng.gen_range(0,10) > 3 {Dir::R} else {Dir::L}
   }
 
   let mut rnd_action = |rng: &mut ThreadRng|{//(&rng: Rng) -> Action {
@@ -116,8 +115,8 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
             cursor_count = cursor_count + 1;
             Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
           }
-          1 => {Action::Cmd(Command::Switch(rnd_cursor(rng)))}
-          2 => {Action::Cmd(Command::Jmp(rnd_cursor(rng)))}
+          1 => {Action::Cmd(Command::Switch(rnd_cursor(rng, cursor_count)))}
+          2 => {Action::Cmd(Command::Jmp(rnd_cursor(rng, cursor_count)))}
           _ => {Action::Undo}
         }
       }
@@ -233,7 +232,7 @@ fn main() {
   let x = value_t!(test_args.value_of("width"), u32).unwrap_or(if test {TEST_WIDTH} else {DEFAULT_WIDTH});
   let y = value_t!(test_args.value_of("height"), u32).unwrap_or(if test {TEST_HEIGHT} else {DEFAULT_HEIGHT});
   let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(if test {DEFAULT_RND_START} else {0});
-  let rnd_adds = value_t!(test_args.value_of("rnd_adds"), u32).unwrap_or(if test {DEFAULT_RND_CMDS} else {0});
+  let rnd_adds = value_t!(test_args.value_of("rnd_cmds"), u32).unwrap_or(if test {DEFAULT_RND_CMDS} else {0});
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let no_cursors = test_args.is_present("no_cursors");
   let use_adapton = !test_args.is_present("spec_only");
@@ -254,7 +253,7 @@ fn main() {
   let mut needs_update = true;
   let mut command_key_down = false;
   let mut status = Inputstatus::Insert(Dir::R, false);
-  let more_inputs = rnd_inputs(rnd_adds, no_cursors);
+  let more_inputs = rnd_inputs(rnd_adds, no_cursors).rev();
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
 
