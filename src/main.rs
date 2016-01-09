@@ -284,7 +284,7 @@ fn main() {
   match outfile {
     None => (),
     Some(ref mut f) => {
-      if let Err(e) = writeln!(f, "## {}", main_edit.csv_title_line()) {
+      if let Err(e) = writeln!(f, "##timestamp, {}, initial cmds", main_edit.csv_title_line()) {
         panic!("can't write to file");
       }
     }
@@ -654,7 +654,7 @@ fn main() {
               match outfile {
                 None => (),
                 Some(ref mut f) => {
-                  if let Err(e) = writeln!(f, "{}", csv) {
+                  if let Err(e) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
                     panic!("can't write to file");
                   }
                 }

@@ -320,8 +320,10 @@ impl EditorPipeline for SpecEditor {
     result
   }
 
+  fn csv_title_line(self: &Self) -> String { "editor, milliseconds".to_string() }
+
   fn stats(self: &mut Self) -> (&CommonStats, String) {
-    (&self.last_stats, format!("{}", self.last_stats.gen_time.num_milliseconds()))
+    (&self.last_stats, format!("Spec, {}", self.last_stats.gen_time.num_milliseconds()))
   }
 
 }
