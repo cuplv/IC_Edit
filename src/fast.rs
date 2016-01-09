@@ -93,7 +93,7 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
       (st, tree, (cur, symz),
        /* Empty */ |st, (cur, symz)| None,
        /* Leaf */  |st, sym, (cur, symz)| match sym {
-         Symbol::Cur(ref c) if c == &cur => { None  /* XXX */ },
+         Symbol::Cur(ref c) if c == &cur => { Some(symz) },
          _ => None,
        },
        /* Bin */ |st, _, l, r, (cur, symz)| {
