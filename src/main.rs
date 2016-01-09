@@ -222,7 +222,7 @@ fn main() {
         [keep_open] -o --keep_open    'do not exit the editor when testing is complete' ")
     )
     .get_matches();
-  let mut test;
+  let test;
   let test_args =
     if let Some(matches) = args.subcommand_matches("test") {
       test = true; matches
@@ -259,7 +259,7 @@ fn main() {
 
   //select editor  
   if use_adapton && use_spec {
-    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors) ) )
+    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
   } else if use_adapton {
     main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
   } else {
