@@ -650,17 +650,18 @@ fn main() {
                 addcursor: true,
                 showcursors: s
               });
-              needs_update = false
-            }
-            let (stat, csv) = main_edit.stats();
-            match outfile {
-              None => (),
-              Some(ref mut f) => {
-                if let Err(e) = writeln!(f, "{}", csv) {
-                  panic!("can't write to file");
+              let (_, csv) = main_edit.stats();
+              match outfile {
+                None => (),
+                Some(ref mut f) => {
+                  if let Err(e) = writeln!(f, "{}", csv) {
+                    panic!("can't write to file");
+                  }
                 }
               }
+              needs_update = false
             }
+            let (stat, _) = main_edit.stats();            
             gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time()));
           }
           Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
