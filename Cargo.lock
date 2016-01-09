@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "adapton"
 version = "0.2.2"
-source = "git+https://github.com/cuplv/adapton.rust.git#f7964830ed61c46f06b54080c4205422ae23b943"
+source = "git+https://github.com/cuplv/adapton.rust.git#29674df96b67787b3d3be156ee5bf46f8ccba596"
 dependencies = [
  "log 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "quickcheck 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
