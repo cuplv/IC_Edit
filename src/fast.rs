@@ -208,8 +208,8 @@ pub fn content_of_cmdz
           Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; (z, active) },
           Command::Move(dir)      => { let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ; (z, active) },
           Command::Ovr(data, dir) => {
-            let (z, _, _) = Symz::replace(st, z, dir2_of_dir(&dir), Symbol::Data(data)) ;
-            let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ;
+            let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
+            let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ;
             (z, active)
           },
           Command::Mk(cursor)     => { let z = Symz::insert(st, z, Dir2::Left, Symbol::Cur(cursor)) ; (z, active) },
