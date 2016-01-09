@@ -309,14 +309,19 @@ impl EditorPipeline for SpecEditor {
 
   fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String> {
     let stat = SpecStats::new();
-    let ((before, after), stat) = build_content(&self.actions, stat);
-    let (out, stat) = makelines(&before, &after, stat, vp.addcursor, vp.showcursors);
-    self.last_stats = stat;
-    out
+    let mut result = List::new();
+    let time = Duration::span(|| {
+      let ((before, after), stat) = build_content(&self.actions, stat);
+      let (out, stat) = makelines(&before, &after, stat, vp.addcursor, vp.showcursors);
+      self.last_stats = stat;
+      result = out;
+    });
+    self.last_stats.gen_time = time;
+    result
   }
 
   fn stats(self: &mut Self) -> (&CommonStats, String) {
-    (&self.last_stats, "Worked".to_string())
+    (&self.last_stats, format!("{}", self.last_stats.gen_time.num_milliseconds()))
   }
 
 }

@@ -40,6 +40,8 @@ mod fast;
 mod verifeditor;
 
 use std::env::current_exe;
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 use time::Duration;
 use glutin_window::GlutinWindow;
 use graphics::Transformed;
@@ -237,7 +239,18 @@ fn main() {
   let no_cursors = test_args.is_present("no_cursors");
   let use_adapton = !test_args.is_present("spec_only");
   let use_spec = !test_args.is_present("fast_only");
-  let outfile = test_args.value_of("outfile");
+  let outfile = match test_args.value_of("outfile") {
+    None => if test {DEFAULT_OUTFILE} else {None},
+    Some(f) => Some(f)
+  };
+  let mut outfile = outfile.map(|f| {
+    OpenOptions::new()
+    .create(true)
+    .write(true)
+    .append(true)
+    .open(f)
+    .unwrap()
+  });
   //TODO: the clap library supports this in param parsing
   //assert_eq!(use_adapton || use_spec, true);
 
@@ -264,6 +277,16 @@ fn main() {
     main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
   } else {
     main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, no_cursors)));
+  }
+
+  // write csv file title
+  match outfile {
+    None => (),
+    Some(ref mut f) => {
+      if let Err(e) = writeln!(f, "## {}", main_edit.csv_title_line()) {
+        panic!("can't write to file");
+      }
+    }
   }
 
   for e in window.events().max_fps(60).ups(50) {
@@ -622,15 +645,22 @@ fn main() {
         match status {
           Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
             if needs_update {
-              time = Duration::span(|| {
-                content_text = main_edit.get_lines(&ViewParams{
-                  addcursor: true,
-                  showcursors: s
-                });
-                needs_update = false
+              content_text = main_edit.get_lines(&ViewParams{
+                addcursor: true,
+                showcursors: s
               });
+              needs_update = false
             }
-            gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, time));
+            let (stat, csv) = main_edit.stats();
+            match outfile {
+              None => (),
+              Some(ref mut f) => {
+                if let Err(e) = writeln!(f, "{}", csv) {
+                  panic!("can't write to file");
+                }
+              }
+            }
+            gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time()));
           }
           Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
             let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
