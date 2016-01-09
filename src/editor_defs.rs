@@ -1,4 +1,6 @@
 use functional::List;
+use time::Duration;
+use std::fmt::Debug;
 
 pub type Cursor = String;
 
@@ -57,7 +59,31 @@ pub struct ViewParams {
 	pub showcursors: bool
 }
 
-pub trait EditorPipeline {
-    fn take_action(self: &mut Self, ac: Action) -> ();
-    fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String>;
+pub trait CommonStats {
+  fn time(self: &Self) -> Duration;
 }
+// impl<S: CommonStats> CommonStats for Box<S> {
+//   fn time(self: &Self) -> Duration {
+//     (**self).time()
+//   }
+// }
+impl<'a, S: CommonStats> CommonStats for &'a S {
+  fn time(self: &Self) -> Duration {
+    (**self).time()
+  }
+}
+
+pub trait EditorPipeline {
+  fn take_action(self: &mut Self, ac: Action) -> ();
+  fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String>;
+  fn csv_title_line(self: &Self) -> String { "Unspecified Data:".to_string() }
+  fn stats(self: &mut Self) -> (
+    &CommonStats, // formal Stats
+    String            // some CSV string
+  );
+}
+
+pub trait StatProvider<S: CommonStats> {
+  fn all_stats(self: &mut Self) -> S; 
+}
+

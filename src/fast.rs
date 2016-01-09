@@ -1,6 +1,7 @@
 use editor_defs::*;
 use std::fmt::{Debug};
 use std::hash::{Hash};
+use time::Duration;
 
 use functional;
 use adapton::adapton_sigs::Adapton;
@@ -16,8 +17,26 @@ use adapton::collection;
 use std::ops::Add;
 use std::num::Zero;
 
+#[derive(Debug)]
+pub struct AdaptonStats {
+  gen_time: Duration,
+}
+impl AdaptonStats {
+  pub fn new() -> AdaptonStats {
+    AdaptonStats{
+      gen_time: Duration::zero(),
+    }
+  }
+}
+impl CommonStats for AdaptonStats {
+  fn time(self: &Self) -> Duration {
+    self.gen_time
+  }
+}
+
 pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
     adapton_st: A,
+    last_stats: AdaptonStats,
     rev_actions: L::List,
 }
 
@@ -31,9 +50,10 @@ pub fn list_of_list<A:Adapton,L:ListT<A,Action>>
 
 impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
     pub fn new(mut st: A, initial_actions: functional::List<Action>) -> AdaptEditor<A,L> {
-        let actions = list_of_list::<A,L>(&mut st, initial_actions) ;
+      let actions = list_of_list::<A,L>(&mut st, initial_actions) ;
       AdaptEditor{
         adapton_st: st,
+        last_stats: AdaptonStats::new(),
         rev_actions: actions,
     }
   }
@@ -379,4 +399,9 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
             make_lines(st, vp, content)
         }
     }
+
+    fn stats(self: &mut Self) -> (&CommonStats, String) {
+      (&self.last_stats, "Worked!".to_string())
+    }
+
 }

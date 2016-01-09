@@ -5,6 +5,7 @@ use editor_defs::*;
 use adapton::adapton_sigs::Adapton;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
+use time::Duration;
 
 pub struct VerifEditor<A:Adapton,L:ListT<A,Action>> {
     spec: SpecEditor,
@@ -18,6 +19,23 @@ impl<A:Adapton,L:ListT<A,Action>> VerifEditor<A,L> {
             fast: AdaptEditor::new(st, acts),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct VeriStats {
+  gen_time: Duration,
+}
+impl VeriStats {
+  pub fn new() -> VeriStats {
+    VeriStats{
+      gen_time: Duration::zero(),
+    }
+  }
+}
+impl CommonStats for VeriStats {
+  fn time(self: &Self) -> Duration {
+    self.gen_time
+  }
 }
 
 impl<A:Adapton,L:ListT<A,Action>>
@@ -35,5 +53,9 @@ impl<A:Adapton,L:ListT<A,Action>>
             panic!("Not equal!\nspec: {:?}\nfast: {:?}", lines_spec, lines_fast )
         }
         lines_fast        
+    }
+
+    fn stats(self: &mut Self) -> (&CommonStats, String) {
+        self.fast.stats()
     }
 }

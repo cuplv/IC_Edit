@@ -1,20 +1,48 @@
 use functional::List;
+use time::Duration;
 use editor_defs::*;
+use std::fmt::Debug;
+
+#[derive(Debug)]
+pub struct SpecStats {
+  gen_time: Duration,
+  processed_cmds: u32,
+  search_failures: u32,
+  read_past_ends: u32,
+}
+
+impl SpecStats {
+  pub fn new() -> SpecStats {
+    SpecStats{
+      gen_time: Duration::zero(),
+      processed_cmds: 0,
+      search_failures: 0,
+      read_past_ends: 0,
+    }
+  }
+}
+impl CommonStats for SpecStats {
+  fn time(self: &Self) -> Duration {
+    self.gen_time
+  }
+}
 
 pub struct SpecEditor {
-    actions: List<Action>
+    last_stats: SpecStats,
+    actions: List<Action>,
 }
 
 impl SpecEditor {
   pub fn new(initial_actions: List<Action>) -> SpecEditor {
     SpecEditor{
-      actions: initial_actions
+      last_stats: SpecStats::new(),
+      actions: initial_actions,
     }
   }
 }
 
 //Action list to undo buffer
-pub fn undobuff_of_actions(acts: &List<Action>) -> Zip<Command> {
+pub fn undobuff_of_actions(acts: &List<Action>, mut stat: SpecStats) -> (Zip<Command>, SpecStats) {
   let mut content: List<Command> = List::new();
   let mut buffer: List<Command> = List::new();
 
@@ -47,12 +75,12 @@ pub fn undobuff_of_actions(acts: &List<Action>) -> Zip<Command> {
     content = content2;
     buffer = buffer2;
   }
-  (content,buffer)
+  ((content,buffer), stat)
 }
 
 //move the zipper through cursors in the given direction 
-pub fn passthrough(direction: Dir, before: List<Symbol>, after: List<Symbol>)
-  -> (List<Symbol>, List<Symbol>) {
+pub fn passthrough(direction: Dir, before: List<Symbol>, after: List<Symbol>, mut stat: SpecStats)
+  -> ((List<Symbol>, List<Symbol>), SpecStats) {
   let mut head;
   let mut first;
   let mut second;
@@ -80,13 +108,13 @@ pub fn passthrough(direction: Dir, before: List<Symbol>, after: List<Symbol>)
   }
 
   match direction {
-    Dir::L => {(first, second)}
-    Dir::R => {(second, first)}
+    Dir::L => {((first, second), stat)}
+    Dir::R => {((second, first), stat)}
   }
 }
 
-pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>)
-  -> Option<(List<Symbol>, List<Symbol>)> {
+pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>, mut stat: SpecStats)
+  -> (Option<(List<Symbol>, List<Symbol>)>, SpecStats) {
   let mut first = l.clone();
   let mut second = r.clone();
 
@@ -100,7 +128,7 @@ pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>)
       }
       Some(Symbol::Cur(c)) => {
         if cur == c {
-          return Some((first.tail(),second))
+          return (Some((first.tail(),second)), stat)
         }else{
           first = first.tail();
           second = second.append(Symbol::Cur(c));
@@ -113,14 +141,14 @@ pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>)
   second = r.clone();
   loop {
     match second.head().map(|h| h.clone()) {
-      None => {return None}
+      None => {return (None, stat)}
       Some(Symbol::Data(d)) => {
         second = second.tail();
         first = first.append(Symbol::Data(d));
       }
       Some(Symbol::Cur(c)) => {
         if cur == c {
-          return Some((first,second.tail()))
+          return (Some((first,second.tail())), stat)
         }else{
           second = second.tail();
           first = first.append(Symbol::Cur(c));
@@ -133,75 +161,76 @@ pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>)
 
 
 // command list to content zipper
-pub fn content_of_commands(commands: &List<Command>) -> CZip<Symbol> {
+pub fn content_of_commands(commands: &List<Command>, mut stat: SpecStats) -> (CZip<Symbol>, SpecStats) {
   let mut before: List<Symbol> = List::new();
   let mut ccursor: Cursor = "0".to_string();
   let mut after: List<Symbol> = List::new();
 
   for command in commands.iter() {
-    let (before2, ccursor2, after2) =
+    let ((before2, ccursor2, after2), s) =
     match *command {
       Command::Ins(ref d, Dir::R) => {
-        let (b, a) = passthrough(Dir::R, before, after);
-        (b.append(Symbol::Data(d.clone())), ccursor, a)
+        let ((b, a), s) = passthrough(Dir::R, before, after, stat);
+        ((b.append(Symbol::Data(d.clone())), ccursor, a), s)
       }
       Command::Ins(ref d, Dir::L) => {
-        let (b, a) = passthrough(Dir::L, before, after);
-        (b, ccursor, a.append(Symbol::Data(d.clone())))
+        let ((b, a),s) = passthrough(Dir::L, before, after, stat);
+        ((b, ccursor, a.append(Symbol::Data(d.clone()))),s)
       }
       Command::Rem(Dir::L) => {
-        let (b, a) = passthrough(Dir::L, before, after);
-        (b.tail(), ccursor, a)
+        let ((b, a),s) = passthrough(Dir::L, before, after, stat);
+        ((b.tail(), ccursor, a),s)
       }
       Command::Rem(Dir::R) => {
-        let (b, a) = passthrough(Dir::R, before, after);
-        (b, ccursor, a.tail())
+        let ((b, a),s) = passthrough(Dir::R, before, after, stat);
+        ((b, ccursor, a.tail()),s)
       }
       Command::Move(Dir::L) => {
-        let (b, a) = passthrough(Dir::L, before, after);
+        let ((b, a),s) = passthrough(Dir::L, before, after, stat);
         match b.head() {
-          None => {(List::new(), ccursor, a)}
-          Some(d) => {(b.tail(), ccursor, a.append(d.clone()))}
+          None => {((List::new(), ccursor, a),s)}
+          Some(d) => {((b.tail(), ccursor, a.append(d.clone())),s)}
         }
       }
       Command::Move(Dir::R) => {
-        let (b, a) = passthrough(Dir::R, before, after);
+        let ((b, a),s) = passthrough(Dir::R, before, after, stat);
         match a.head() {
-          None => {(b, ccursor, List::new())}
-          Some(d) => {(b.append(d.clone()), ccursor, a.tail())}
+          None => {((b, ccursor, List::new()),s)}
+          Some(d) => {((b.append(d.clone()), ccursor, a.tail()),s)}
         }
       }
       Command::Ovr(ref d, Dir::L) => {
-        let (b, a) = passthrough(Dir::L, before, after);
-        (b.tail(), ccursor, a.append(Symbol::Data(d.clone())))
+        let ((b, a),s) = passthrough(Dir::L, before, after, stat);
+        ((b.tail(), ccursor, a.append(Symbol::Data(d.clone()))),s)
       }
       Command::Ovr(ref d, Dir::R) => {
-        let (b, a) = passthrough(Dir::R, before, after);
-        (b.append(Symbol::Data(d.clone())), ccursor, a.tail())
+        let ((b, a),s) = passthrough(Dir::R, before, after, stat);
+        ((b.append(Symbol::Data(d.clone())), ccursor, a.tail()),s)
       }
       Command::Mk(ref c) => {
-        (before.append(Symbol::Cur(c.clone())), ccursor, after)
+        ((before.append(Symbol::Cur(c.clone())), ccursor, after),stat)
       }
       Command::Switch(ref c) => {
         let withcursor = before.append(Symbol::Cur(ccursor.clone()));
-        match join_cursor(c.clone(), &withcursor, &after) {
-          Some((b,a)) => {(b, c.clone(), a)}
-          None => {(before, ccursor, after)}
+        let (find,s) = join_cursor(c.clone(), &withcursor, &after, stat);
+        match find {
+          Some((b,a)) => {((b, c.clone(), a),s)}
+          None => {((before, ccursor, after),s)}
         }
       }
       Command::Jmp(ref c) => {
-        match join_cursor(c.clone(), &before, &after) {
-          Some((b,a)) => {
+        match join_cursor(c.clone(), &before, &after, stat) {
+          (Some((b,a)),s) => {
             let withcursor = b.append(Symbol::Cur(c.clone()));
-            (withcursor, ccursor, a)
+            ((withcursor, ccursor, a),s)
           }
-          None => {(before, ccursor, after)}
+          (None,s) => {((before, ccursor, after),s)}
         }
       }
       Command::Join(ref c) => {
-        match join_cursor(c.clone(), &before, &after) {
-          Some((b,a)) => {(b, c.clone(), a)}
-          None => {(before, ccursor, after)}
+        match join_cursor(c.clone(), &before, &after, stat) {
+          (Some((b,a)),s) => {((b, c.clone(), a),s)}
+          (None,s) => {((before, ccursor, after),s)}
         }
       }
     };
@@ -209,18 +238,19 @@ pub fn content_of_commands(commands: &List<Command>) -> CZip<Symbol> {
     before = before2;
     after = after2;
     ccursor = ccursor2;
+    stat = s;
   }
 
-  (before, ccursor, after)
+  ((before, ccursor, after), stat)
 }
 
-pub fn build_content(keys: &List<Action>) -> (List<Symbol>,List<Symbol>) {    
-  let (commands, _) = undobuff_of_actions(&keys.rev());
-  let (before, _, after) = content_of_commands(&commands.rev());    
-  (before, after)
+pub fn build_content(keys: &List<Action>, mut stat: SpecStats) -> ((List<Symbol>,List<Symbol>), SpecStats) {
+  let ((commands, _),stat) = undobuff_of_actions(&keys.rev(), stat);
+  let ((before, _, after), stat) = content_of_commands(&commands.rev(), stat);    
+  ((before, after), stat)
 }
 
-pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, showcursors: bool) -> List<String> {
+pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, mut stat: SpecStats, addbar: bool, showcursors: bool) -> (List<String>, SpecStats) {
   let mut out: List<String> = List::new();
   let mut partial: String = "".to_string();
   let (max_lines_before, max_lines_after) = (40, 20) ;
@@ -269,18 +299,26 @@ pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, addbar: bool, show
   }
   out = out.append(partial);
 
-  out
+  (out, stat)
 }
 
 impl EditorPipeline for SpecEditor {
-    fn take_action(self: &mut Self, ac: Action) -> () {
-      self.actions = self.actions.append(ac);
-    }
+  fn take_action(self: &mut Self, ac: Action) -> () {
+    self.actions = self.actions.append(ac);
+  }
 
-    fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String> {
-      let (before, after) = build_content(&self.actions);
-      makelines(&before, &after, vp.addcursor, vp.showcursors)
-    }
+  fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String> {
+    let stat = SpecStats::new();
+    let ((before, after), stat) = build_content(&self.actions, stat);
+    let (out, stat) = makelines(&before, &after, stat, vp.addcursor, vp.showcursors);
+    self.last_stats = stat;
+    out
+  }
+
+  fn stats(self: &mut Self) -> (&CommonStats, String) {
+    (&self.last_stats, "Worked".to_string())
+  }
+
 }
 
 
