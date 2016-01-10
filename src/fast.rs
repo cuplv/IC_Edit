@@ -225,10 +225,10 @@ pub fn content_of_cmdz
                                        let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
                                        match z_new {
                                          None => {
-                                           let (z, _) = Symz::remove(st, z, Dir2::Left);
+                                           //let (z, _) = Symz::remove(st, z, Dir2::Left);
                                            (z, active)
                                          }
-                                         Some(z) => (z, cursor),
+                                         Some(new_z) => (new_z, cursor),
                                        }}
 
           Command::Jmp(cursor)    => { let z_new = Symz::empty(st);
@@ -357,7 +357,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn take_action(self: &mut Self, ac: Action) -> () {
     // XXX: Kyle and I don't know how to do this without cloning!
     // TODO: Need to insert names and articulations into this list
-    println!("take_action: {:?}", ac);
+    // println!("take_action: {:?}", ac);
     self.rev_actions =
       L::cons(&mut self.adapton_st, ac, self.rev_actions.clone())
   }
@@ -367,14 +367,14 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
     let time = Duration::span(|| {
-      println!("-----");
+      // println!("-----");
       
       let st = &mut self.adapton_st ;
       
       let acts = self.rev_actions.clone() ;
       let actions = tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts) ;
 
-      println!("actions: {:?}", actions);
+      // println!("actions: {:?}", actions);
 
       let (cmdz, _) = cmdz_of_actions::<A
         ,collection::Tree<A,Action,u32>
@@ -384,7 +384,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
       let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;
       let cmdt = ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left) ;
 
-      println!("cmdt: {:?}", cmdt);       
+      // println!("cmdt: {:?}", cmdt);       
       
       let (content, _, _) = content_of_cmdz::<
         A,collection::Tree<A,Command,u32>            
@@ -392,7 +392,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
         ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
         >(st, cmdt) ;
 
-      println!("content: {:?}", content);
+      // println!("content: {:?}", content);
 
       result = make_lines(st, vp, content)
     });

@@ -105,7 +105,7 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
   }
 
   let mut rnd_action = |rng: &mut ThreadRng|{//(&rng: Rng) -> Action {
-    match rng.gen_range(0, 100) {
+    match rng.gen_range(0, 200) {
       0 ... 19 => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
       20 ... 69 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
       70 ... 79 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
@@ -265,7 +265,7 @@ fn main() {
   let mut time = Duration::seconds(0);
   let mut needs_update = true;
   let mut command_key_down = false;
-  let mut status = Inputstatus::Insert(Dir::R, false);
+  let mut status = Inputstatus::Insert(Dir::R, true); // XXX showcursors command line flag
   let more_inputs = rnd_inputs(rnd_adds, no_cursors).rev();
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
