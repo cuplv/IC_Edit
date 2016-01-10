@@ -1,3 +1,4 @@
+line movement (up/down)
 viewparams window size ("line_count_before" "line_count_after")
 fast:: additional cursors not placed correctly in output
 remove debug info
@@ -7,4 +8,3 @@ ctrl-q to quit, free up esc key
 shaded background for HUD
 command line option for: show cursors, controls over distribution of random command 
 more HUD info: inputstatus state {L/R, Ins/Ovr, showcursors, cost/profiling}
-
