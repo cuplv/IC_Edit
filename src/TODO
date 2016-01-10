@@ -4,3 +4,6 @@ remove debug info
 blinking cursor, and colors
 more stats on screen
 ctrl-q to quit, free up esc key
+shaded background for HUD
+more HUD info: inputstatus state {L/R, Ins/Ovr, showcursors, cost/profiling}
+

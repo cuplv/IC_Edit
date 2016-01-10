@@ -224,10 +224,7 @@ pub fn content_of_cmdz
           Command::Switch(cursor) => { let z_new = Symz::empty(st);
                                        let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
                                        match z_new {
-                                         None => {
-                                           //let (z, _) = Symz::remove(st, z, Dir2::Left);
-                                           (z, active)
-                                         }
+                                         None =>        (z, active),
                                          Some(new_z) => (new_z, cursor),
                                        }}
 
