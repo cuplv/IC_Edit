@@ -271,7 +271,7 @@ fn main() {
   let mut content_text = List::new().append("".to_string());
 
   //select editor  
-  if use_adapton && use_spec {
+  if test && use_adapton && use_spec {
     println!("Preparing to perform dynamic verification ...");
     main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
   } else if use_adapton {

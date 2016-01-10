@@ -335,7 +335,7 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
     match x {
       None => { break },
       Some(Symbol::Cur(ref c)) => {
-        if vp.showcursors {cur_line = cur_line + "<" + &c + ">"}
+        if vp.showcursors {cur_line = "<".to_string() + &c + ">" + &cur_line}
       }
       Some(Symbol::Data(ref d)) => {
         if d == "\n" {
