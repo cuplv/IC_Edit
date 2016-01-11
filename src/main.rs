@@ -275,10 +275,10 @@ fn main() {
     //println!("Preparing to perform dynamic verification ...");
     println!("Using VerifEditor::<Engine,_> ...");
     main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
-  } else if false /* use_adapton */ {
+  } else if use_adapton {
     println!("Using AdaptEditor::<Engine,_> ...");
     main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
-  } else if true {
+  } else if false {
     // Seems to overrun the stack;
     // tried using `export RUST_MIN_STACK=20485760` on the command line to mitigate this, but it didn't help.
     println!("Using AdaptEditor::<Naive,_> ...");
