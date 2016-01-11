@@ -35,6 +35,7 @@ impl CommonStats for AdaptonStats {
 }
 
 pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
+  next_id: usize,
   adapton_st: A,
   last_stats: AdaptonStats,
   rev_actions: L::List,
@@ -52,6 +53,7 @@ impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
   pub fn new(mut st: A, initial_actions: functional::List<Action>) -> AdaptEditor<A,L> {
     let actions = list_of_list::<A,L>(&mut st, initial_actions) ;
     AdaptEditor{
+      next_id: 0,
       adapton_st: st,
       last_stats: AdaptonStats::new(),
       rev_actions: actions,
@@ -131,7 +133,8 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
        )
   }
 
-pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
+
+pub fn tree_info_rec<A:Adapton,T:TreeT<A,Symbol>>
   (st:&mut A, tree:T::Tree) -> ContentInfo
 {
   T::fold_up(
@@ -148,6 +151,13 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
     &|st,  _,l,r| (l + r),
     &|st,_,_,l,r| (l + r),
     )
+}
+
+pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
+  (st:&mut A, tree:T::Tree) -> ContentInfo
+{
+  let nm = st.name_of_string("tree_info".to_string());
+  st.ns(nm, |st| tree_info_rec::<A,T>(st, tree) )
 }
 
 pub fn dir2_of_dir (d:&Dir) -> Dir2 {
@@ -204,9 +214,30 @@ pub fn content_of_cmdz
           _ => z
         } ;
         let (z, active) = match cmd {
-          Command::Ins(data, dir) => { let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ; (z, active) }
-          Command::Rem(dir)       => { let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ; (z, active) },
-          Command::Move(dir)      => { let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ; (z, active) },
+
+          Command::Ins(data, dir) => {
+            let z = match nm {
+              Some(ref nm) => {
+                let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ;
+                let z = Symz::ins_cell(st, z, dir2_of_dir(&dir.opp()), nm.clone()) ;
+                let z = Symz::ins_name(st, z, dir2_of_dir(&dir.opp()), nm.clone()) ;
+                z
+              },
+              None => Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)),
+            } ;
+            (z, active)
+          },
+
+          Command::Rem(dir) => {
+            let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
+            (z, active)
+          },
+
+          Command::Move(dir) => {
+            let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ;
+            (z, active)
+          },
+
           Command::Ovr(data, dir) => {
             let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
             let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ;
@@ -241,9 +272,13 @@ pub fn content_of_cmdz
         (z, nm, active)
       },
       /* Bin  */ &|st, _, r| r,
+
       /* Name */ &|st, nm2, _, (z,nm1,active)| match nm1 {
         None => (z, Some(nm2), active),
-        Some(_) => panic!("nominal ambiguity!")
+        Some(_) =>
+          // XXXX FIX ME!
+          //panic!("nominal ambiguity! Should we use {:?} or {:?} ?", nm1, nm2)
+          (z, Some(nm2), active)
       },
       )
   }
@@ -273,8 +308,10 @@ pub fn cmdz_of_actions
              let z = match nm {
                None => Edit::insert(st, z, Dir2::Left, c),
                Some(nm) => {
-                 // TODO: Use nm
-                 Edit::insert(st, z, Dir2::Left, c)
+                 let z = Edit::insert(st, z, Dir2::Left, c) ;
+                 let z = Edit::ins_cell(st, z, Dir2::Left, nm.clone()) ;
+                 let z = Edit::ins_name(st, z, Dir2::Left, nm) ;
+                 z
                }} ;
              (z, None)
            }
@@ -350,13 +387,34 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
   out_lines
 }
 
+
+// macro_rules! namespace {
+//   ( $st:expr , $name:expr =>> $code:expr ) =>
+//   {{
+//     let nm = ($st).name_of_string( ($name).to_string() ) ;
+//     ($st).ns(nm, |st| {
+//       $code
+//     })}};
+// }
+
 impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn take_action(self: &mut Self, ac: Action) -> () {
     // XXX: Kyle and I don't know how to do this without cloning!
-    // TODO: Need to insert names and articulations into this list
+    // Done: Need to insert names and articulations into this list
     // println!("take_action: {:?}", ac);
-    self.rev_actions =
-      L::cons(&mut self.adapton_st, ac, self.rev_actions.clone())
+    let id = self.next_id ;
+    self.next_id += 1 ;
+    let nm = self.adapton_st.name_of_usize(id) ;
+    let (nm1,nm2) = self.adapton_st.name_fork(nm) ;    
+    self.rev_actions = {
+      let l   = self.rev_actions.clone() ;
+      let l   = L::cons(&mut self.adapton_st, ac, l) ;
+      let art = self.adapton_st.cell( nm1, l ) ;
+      let art = self.adapton_st.read_only( art ) ;
+      let l   =  L::art(&mut self.adapton_st, art) ;
+      let l   = L::name(&mut self.adapton_st, nm2, l) ;
+      l
+    }
   }
   
   //   fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<functional::List<Color,String>> {
@@ -364,24 +422,32 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
     let time = Duration::span(|| {
-      // println!("-----");
+      println!("-----");
       
       let st = &mut self.adapton_st ;
       
       let acts = self.rev_actions.clone() ;
-      let actions = tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts) ;
-
-      // println!("actions: {:?}", actions);
+      let actions = {
+        let nm = st.name_of_string("tree_of_list".to_string()) ;
+        st.ns(nm, |st| {
+          tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)
+        })} ;
+      
+      println!("actions: {:?}", actions);
 
       let (cmdz, _) = cmdz_of_actions::<A
         ,collection::Tree<A,Action,u32>
         ,collection::Tree<A,Command,u32>
         ,ListZipper<A,Command,Tree<A,Command,u32>,List<A,Command>>> (st, actions) ;
-
+      
       let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;
-      let cmdt = ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left) ;
+      let cmdt = {
+        let nm = st.name_of_string("get_tree".to_string()) ;
+        st.ns(nm, |st| {
+          ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left)
+        })} ;
 
-      // println!("cmdt: {:?}", cmdt);       
+      println!("cmdt: {:?}", cmdt);       
       
       let (content, _, _) = content_of_cmdz::<
         A,collection::Tree<A,Command,u32>            
@@ -389,7 +455,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
         ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
         >(st, cmdt) ;
 
-      // println!("content: {:?}", content);
+      println!("content: {:?}", content);
 
       result = make_lines(st, vp, content)
     });
