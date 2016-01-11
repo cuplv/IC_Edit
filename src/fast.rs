@@ -103,12 +103,12 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree(st, symz, Dir2::Right, r);
+           let symz = Symz::ins_tree(st, symz, Dir2::Right, r, Dir2::Left);
            return tree_focus::<A,T,Symz>(st, l, cur, symz)
          }
          else if ri.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree(st, symz, Dir2::Left, l);
+           let symz = Symz::ins_tree(st, symz, Dir2::Left, l, Dir2::Right);
            return tree_focus::<A,T,Symz>(st, r, cur, symz)
          }
          else
@@ -119,12 +119,12 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree(st, symz, Dir2::Right, r);
+           let symz = Symz::ins_tree(st, symz, Dir2::Right, r, Dir2::Left);
            return tree_focus::<A,T,Symz>(st, l, cur, symz)
          }
          else if ri.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree(st, symz, Dir2::Left, l);
+           let symz = Symz::ins_tree(st, symz, Dir2::Left, l, Dir2::Right);
            return tree_focus::<A,T,Symz>(st, r, cur, symz)
          }
          else
@@ -421,44 +421,48 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<String> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
-    let time = Duration::span(|| {
-      println!("-----");
-      
-      let st = &mut self.adapton_st ;
-      
-      let acts = self.rev_actions.clone() ;
-      let actions = {
-        let nm = st.name_of_string("tree_of_list".to_string()) ;
-        st.ns(nm, |st| {
-          tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)
-        })} ;
-      
-      println!("actions: {:?}", actions);
-
-      let (cmdz, _) = cmdz_of_actions::<A
-        ,collection::Tree<A,Action,u32>
-        ,collection::Tree<A,Command,u32>
-        ,ListZipper<A,Command,Tree<A,Command,u32>,List<A,Command>>> (st, actions) ;
-      
-      let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;
-      let cmdt = {
-        let nm = st.name_of_string("get_tree".to_string()) ;
-        st.ns(nm, |st| {
-          ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left)
-        })} ;
-
-      println!("cmdt: {:?}", cmdt);       
-      
-      let (content, _, _) = content_of_cmdz::<
-        A,collection::Tree<A,Command,u32>            
-        ,collection::Tree<A,Symbol,u32>
-        ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
-        >(st, cmdt) ;
-
-      println!("content: {:?}", content);
-
-      result = make_lines(st, vp, content)
-    });
+    let acts = self.rev_actions.clone() ;
+    let (time, cnt) =
+      self.adapton_st.cnt(|st| { 
+        let time = Duration::span(|| {
+          println!("-----");
+          
+          let actions = {
+            let nm = st.name_of_string("tree_of_list".to_string()) ;
+            st.ns(nm, |st| {
+              tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)
+            })} ;
+          
+          println!("actions: {:?}", actions);
+          
+          let (cmdz, _) = cmdz_of_actions::<A
+            ,collection::Tree<A,Action,u32>
+            ,collection::Tree<A,Command,u32>
+            ,ListZipper<A,Command,Tree<A,Command,u32>,List<A,Command>>> (st, actions) ;
+          
+          let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;
+          let cmdt = {
+            let nm = st.name_of_string("get_tree".to_string()) ;
+            st.ns(nm, |st| {
+              ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left)
+            })} ;
+          
+          println!("cmdt: {:?}", cmdt);       
+          
+          let (content, _, _) = content_of_cmdz::<
+            A,collection::Tree<A,Command,u32>            
+            ,collection::Tree<A,Symbol,u32>
+            ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
+            >(st, cmdt) ;
+          
+          println!("content: {:?}", content);
+          
+          result = make_lines(st, vp, content) ;
+        }) ;
+        time      
+      }) ;
+    println!("{:?}", cnt) ;
+    
     self.last_stats.gen_time = time;
     result
   }

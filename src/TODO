@@ -12,3 +12,4 @@ more HUD info:
  -- number of characters
  -- number of cursors
 shaded background for HUD
+command line option for Naive (instead of Engine)
