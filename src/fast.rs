@@ -430,35 +430,42 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
         let time = Duration::span(|| {
           println!("-----");
           
-          let actions = {
+          let (actiont, actiont_cnt) = st.cnt(|st| {
             let nm = st.name_of_string("tree_of_list".to_string()) ;
             st.ns(nm, |st| {
-              tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)
-            })} ;
+              tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)                
+            })}) ;
           
-          println!("actions: {:?}", actions);
+          println!("actiont: {:?} {:?}", actiont_cnt, actiont);
+
+          let (cmdz, cmdz_cnt) = st.cnt(|st| {
+            let (cmdz, _) = cmdz_of_actions::<A
+              ,collection::Tree<A,Action,u32>
+              ,collection::Tree<A,Command,u32>
+              ,ListZipper<A,Command,Tree<A,Command,u32>,List<A,Command>>> (st, actiont) ;
+            cmdz
+          }) ;
           
-          let (cmdz, _) = cmdz_of_actions::<A
-            ,collection::Tree<A,Action,u32>
-            ,collection::Tree<A,Command,u32>
-            ,ListZipper<A,Command,Tree<A,Command,u32>,List<A,Command>>> (st, actions) ;
-          
-          let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;
-          let cmdt = {
+          println!("cmdz:    {:?} {:?}", cmdz_cnt, cmdz);
+
+          let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;          
+          let (cmdt, cmdt_cnt) = st.cnt(|st|{
             let nm = st.name_of_string("get_tree".to_string()) ;
             st.ns(nm, |st| {
               ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left)
-            })} ;
+            })}) ;
           
-          println!("cmdt: {:?}", cmdt);       
+          println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
+
+          let (content, content_cnt) = st.cnt(|st|{
+            let (content, _, _) = content_of_cmdz::<
+              A,collection::Tree<A,Command,u32>            
+              ,collection::Tree<A,Symbol,u32>
+              ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
+              >(st, cmdt) ;
+            content }) ;
           
-          let (content, _, _) = content_of_cmdz::<
-            A,collection::Tree<A,Command,u32>            
-            ,collection::Tree<A,Symbol,u32>
-            ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
-            >(st, cmdt) ;
-          
-          println!("content: {:?}", content);
+          println!("content: {:?} {:?}", content_cnt, content);
           
           result = make_lines(st, vp, content) ;
         }) ;
