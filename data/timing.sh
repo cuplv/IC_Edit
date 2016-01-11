@@ -2,7 +2,7 @@
 FILE=timing.csv
 
 # test runner
-TESTER="cargo run -- test -n "
+TESTER="cargo run --release -- test "
 
 for start in 100 200 300 400 500 600 700 800 900; do
   for ver in "-r" "-a"; do 

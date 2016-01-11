@@ -4,7 +4,6 @@ remove debug info
 blinking cursor, and colors
 more stats on screen
 ctrl-q to quit, free up esc key
-shaded background for HUD
 command line option for: show cursors, controls over distribution of random command 
 more HUD info:
  -- inputstatus state {L/R, Ins/Ovr, showcursors, cost/profiling}

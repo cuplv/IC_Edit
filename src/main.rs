@@ -150,6 +150,9 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   }
 
   //info section
+  let hud_bcolor = [0.2, 0.2, 0.2, 0.8];
+  let hud_back = [590.0, 5.0, 200.0, 200.0];
+  graphics::rectangle(hud_bcolor, hud_back, c.transform, g); // shaded background
   let size = 16.0;
   let mut text = graphics::Text::new(16);
   text.color = [1.0, 0.0, 0.0, 1.0];
