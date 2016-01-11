@@ -319,7 +319,10 @@ pub fn cmdz_of_actions
        /* Bin  */ &|st, _, r| r,
        /* Name */ &|st, nm2, _, (z,nm1)| match nm1 {
          None => (z, Some(nm2)),
-         Some(_) => panic!("nominal ambiguity!")
+         Some(_) =>
+          // XXXX FIX ME!
+          //panic!("nominal ambiguity! Should we use {:?} or {:?} ?", nm1, nm2)
+          (z, Some(nm2))
        },
        )
    }
