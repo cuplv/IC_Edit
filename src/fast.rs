@@ -157,7 +157,11 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
   (st:&mut A, tree:T::Tree) -> ContentInfo
 {
   let nm = st.name_of_string("tree_info".to_string());
-  st.ns(nm, |st| tree_info_rec::<A,T>(st, tree) )
+  let (res, cnt) = st.cnt(|st|{
+    st.ns(nm, |st| tree_info_rec::<A,T>(st, tree) )
+  }) ;
+  println!("tree_info: {:?} {:?}", cnt, res);
+  res
 }
 
 pub fn dir2_of_dir (d:&Dir) -> Dir2 {
