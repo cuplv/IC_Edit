@@ -207,7 +207,7 @@ pub fn content_of_cmdz
               Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
             _ => z.clone()
           };
-          Symz::get_tree::<Syms>(st, z, Dir2::Left)
+          Symz::get_tree(st, z, Dir2::Left)
         } ;
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {
@@ -456,7 +456,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           let (cmdt, cmdt_cnt) = st.cnt(|st|{
             let nm = st.name_of_string("get_tree".to_string()) ;
             st.ns(nm, |st| {
-              ListZipper::get_tree::<collection::Tree<A,Command,u32>>(st, cmdz, Dir2::Left)
+              ListZipper::get_tree(st, cmdz, Dir2::Left)
             })}) ;
           
           println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
