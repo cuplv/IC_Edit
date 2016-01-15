@@ -160,7 +160,7 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
   let (res, cnt) = st.cnt(|st|{
     st.ns(nm, |st| tree_info_rec::<A,T>(st, tree) )
   }) ;
-  println!("tree_info: {:?} {:?}", cnt, res);
+  //println!("tree_info: {:?} {:?}", cnt, res);
   res
 }
 
