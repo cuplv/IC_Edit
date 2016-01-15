@@ -49,7 +49,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
 use piston::input::{Button, Event, Input, Key};
-use piston::window::WindowSettings;
+use piston::window::{WindowSettings, NoWindow};
 use editor_defs::*;
 use functional::List;
 use spec::SpecEditor;
@@ -226,13 +226,26 @@ fn main() {
         [fast_only] -a --adapton      'only test adapton implementation'
         [keep_open] -o --keep_open    'do not exit the editor when testing is complete' ")
     )
+    .subcommand(clap::SubCommand::with_name("windowless")
+      .about("windowless options")
+      .args_from_usage("\
+        -s --rnd_start=[rnd_start]    'number of random starting commands'
+        -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
+        -f --outfile=[outfile]        'filename for testing output'
+        [no_cursors] -n --no_cursors  'do not use cursors in random commands'
+        [spec_only] -r --reference    'only test reference implementation'
+        [fast_only] -a --adapton      'only test adapton implementation' ")
+    )
     .get_matches();
   let test;
+  let windowless;
   let test_args =
     if let Some(matches) = args.subcommand_matches("test") {
-      test = true; matches
+      test = true; windowless = false; matches
+    } else if let Some(matches) = args.subcommand_matches("windowless") {
+      test = true; windowless = true; matches
     } else {
-      test = false; &args
+      test = false; windowless = false; &args
     };
   let x = value_t!(test_args.value_of("width"), u32).unwrap_or(if test {TEST_WIDTH} else {DEFAULT_WIDTH});
   let y = value_t!(test_args.value_of("height"), u32).unwrap_or(if test {TEST_HEIGHT} else {DEFAULT_HEIGHT});
@@ -257,18 +270,10 @@ fn main() {
   //TODO: the clap library supports this in param parsing
   //assert_eq!(use_adapton || use_spec, true);
 
-  //graphics
-  let window = try_create_window(x, y).unwrap();
-  let mut gl = GlGraphics::new(OPEN_GL);
-  let exe_directory = current_exe().unwrap().parent().unwrap().to_owned();
-  let mut font = GlyphCache::new(&exe_directory.join("../../FiraMono-Bold.ttf")).unwrap();
-
   //loop data
   let mut main_edit: Box<EditorPipeline>;
   let mut time = Duration::seconds(0);
   let mut needs_update = true;
-  let mut command_key_down = false;
-  let mut status = Inputstatus::Insert(Dir::R, true); // XXX showcursors command line flag
   let more_inputs = rnd_inputs(rnd_adds, no_cursors).rev();
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
@@ -301,271 +306,332 @@ fn main() {
     }
   }
 
-  for e in window.events().max_fps(60).ups(50) {
-    match e {
-      //gives typed char or empty
-      Event::Input(Input::Text(t)) => {
-        if t == "" || command_key_down {continue}
-        status = match status {
-          Inputstatus::Insert(d, s) => {
-            main_edit.take_action(Action::Cmd(Command::Ins(t,d.clone())));
-            Inputstatus::Insert(d, s)
+  if windowless {
+    loop {
+
+      //update content
+      content_text = main_edit.get_lines(&ViewParams{
+        addcursor: true,
+        showcursors: true
+      });
+      let (_, csv) = main_edit.stats();
+      match outfile {
+        None => (),
+        Some(ref mut f) => {
+          if let Err(e) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
+            panic!("can't write to file");
           }
-          Inputstatus::Overwrite(d, s) => {
-            main_edit.take_action(Action::Cmd(Command::Ovr(t,d.clone())));
-            Inputstatus::Overwrite(d, s)
-          }
-          Inputstatus::EnterCursor(p,c,mut e @ _) => {
-            e.take_action(Action::Cmd(Command::Ins(t,Dir::R)));
-            Inputstatus::EnterCursor(p,c,e)
-          }
-        };
-        needs_update = true;
-      }
-      Event::Input(Input::Release(Button::Keyboard(key))) => {
-        match key {
-          //mac's command key registers as unknown on my machine
-          Key::Unknown |
-          Key::LCtrl |
-          //Key::LAlt |
-          Key::RCtrl |
-          Key::RAlt => {
-            command_key_down = false;
-          }
-          _ => {}
         }
       }
-      Event::Input(Input::Press(Button::Keyboard(key))) => {
-        match key {
-          //command keys
-          //mac's command key registers as unknown on my machine
-          Key::Unknown |
-          Key::LCtrl |
-          //Key::LAlt |
-          Key::RCtrl |
-          Key::RAlt => {
-            command_key_down = true;
-          }
 
-          Key::Up => {
-            if command_key_down {
-              println!("Mode: Overwrite");
-              status = match status {
-                Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
-                  Inputstatus::Overwrite(d, s)
-                }
-                Inputstatus::EnterCursor(p,c,a) => {
-                  Inputstatus::EnterCursor(p,c,a)                  
-                }
-              };
-            } else {
-              println!("{:?}", key)
+      //display stats
+      {
+        let (stat, _) = main_edit.stats();
+        println!("Milliseconds: {}", stat.time().num_milliseconds()); 
+      }
+      //add action
+      match more_inputs_iter.next() {
+        Some(cmd) => {
+          main_edit.take_action(cmd.clone());
+          needs_update = true;
+        }
+        None => {
+          break
+        }
+      }
+
+
+    }
+  }else{
+  // graphics
+    let window = try_create_window(x, y).unwrap();
+    let mut gl = GlGraphics::new(OPEN_GL);
+    let exe_directory = current_exe().unwrap().parent().unwrap().to_owned();
+    let mut font = GlyphCache::new(&exe_directory.join("../../FiraMono-Bold.ttf")).unwrap();
+    
+    // input
+    let mut command_key_down = false;
+    let mut status = Inputstatus::Insert(Dir::R, true); // XXX showcursors command line flag
+
+    for e in window.events().max_fps(60).ups(50) {
+      match e {
+        //gives typed char or empty
+        Event::Input(Input::Text(t)) => {
+          if t == "" || command_key_down {continue}
+          status = match status {
+            Inputstatus::Insert(d, s) => {
+              main_edit.take_action(Action::Cmd(Command::Ins(t,d.clone())));
+              Inputstatus::Insert(d, s)
             }
-          }
-          Key::Down => {
-            if command_key_down {
-              println!("Mode: Insert");
-              status = match status {
-                Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
-                  Inputstatus::Insert(d, s)
-                }
-                Inputstatus::EnterCursor(p,c,a) => {
-                  Inputstatus::EnterCursor(p,c,a)                  
-                }
-              };
-            } else {
-              println!("{:?}", key)
+            Inputstatus::Overwrite(d, s) => {
+              main_edit.take_action(Action::Cmd(Command::Ovr(t,d.clone())));
+              Inputstatus::Overwrite(d, s)
             }
-          }
-          Key::Left => {
-            if command_key_down {
-              println!("Mode: Left");
-              status = match status {
-                Inputstatus::Insert(_, s) => {
-                  Inputstatus::Insert(Dir::L, s)
-                }
-                Inputstatus::Overwrite(_, s) => {
-                  Inputstatus::Overwrite(Dir::L, s)
-                }
-                Inputstatus::EnterCursor(p,c,e) => {
-                  Inputstatus::EnterCursor(p,c,e)                  
-                }
-              };
+            Inputstatus::EnterCursor(p,c,mut e @ _) => {
+              e.take_action(Action::Cmd(Command::Ins(t,Dir::R)));
+              Inputstatus::EnterCursor(p,c,e)
             }
-            else{
-              status = match status {
-                Inputstatus::Insert(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Move(Dir::L))
-                  );
-                  Inputstatus::Insert(d, s)
-                }
-                Inputstatus::Overwrite(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Move(Dir::L))
-                  );
-                  Inputstatus::Overwrite(d, s)
-                }
-                Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                  e.take_action(Action::Cmd(Command::Move(Dir::L)));
-                  Inputstatus::EnterCursor(p,c,e)                  
-                }
-              };
-              needs_update = true;
+          };
+          needs_update = true;
+        }
+        Event::Input(Input::Release(Button::Keyboard(key))) => {
+          match key {
+            //mac's command key registers as unknown on my machine
+            Key::Unknown |
+            Key::LCtrl |
+            //Key::LAlt |
+            Key::RCtrl |
+            Key::RAlt => {
+              command_key_down = false;
             }
+            _ => {}
           }
-          Key::Right => {
-            if command_key_down {
-              println!("Mode: Right");
-              status = match status {
-                Inputstatus::Insert(_, s) => {
-                  Inputstatus::Insert(Dir::R, s)
-                }
-                Inputstatus::Overwrite(_, s) => {
-                  Inputstatus::Overwrite(Dir::R, s)
-                }
-                Inputstatus::EnterCursor(p,c,e) => {
-                  Inputstatus::EnterCursor(p,c,e)                  
-                }
-              };
+        }
+        Event::Input(Input::Press(Button::Keyboard(key))) => {
+          match key {
+            //command keys
+            //mac's command key registers as unknown on my machine
+            Key::Unknown |
+            Key::LCtrl |
+            //Key::LAlt |
+            Key::RCtrl |
+            Key::RAlt => {
+              command_key_down = true;
             }
-            else{
-              status = match status {
-                Inputstatus::Insert(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Move(Dir::R))
-                  );
-                  Inputstatus::Insert(d, s)
-                }
-                Inputstatus::Overwrite(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Move(Dir::R))
-                  );
-                  Inputstatus::Overwrite(d, s)
-                }
-                Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                  e.take_action(Action::Cmd(Command::Move(Dir::R)));
-                  Inputstatus::EnterCursor(p,c,e)                  
-                }
-              };
-              needs_update = true;
+
+            Key::Up => {
+              if command_key_down {
+                println!("Mode: Overwrite");
+                status = match status {
+                  Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
+                    Inputstatus::Overwrite(d, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,a) => {
+                    Inputstatus::EnterCursor(p,c,a)                  
+                  }
+                };
+              } else {
+                println!("{:?}", key)
+              }
             }
-          }
-          /*Delete*/Key::D => {
-            if command_key_down {
-              status = match status {
-                Inputstatus::Insert(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Rem(d.clone()))
-                  );
-                  Inputstatus::Insert(d, s)
-                }
-                Inputstatus::Overwrite(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Rem(d.clone()))
-                  );
-                  Inputstatus::Overwrite(d, s)
-                }
-                Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                  e.take_action(Action::Cmd(Command::Rem(Dir::R)));
-                  Inputstatus::EnterCursor(p,c,e)                  
-                }
-              };
-              needs_update = true;
-            } else {continue}
-          }
-          Key::Backspace  => {
-            if command_key_down {println!("C: Backspace");}
-            else{
-              status = match status {
-                Inputstatus::Insert(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Rem(d.opp()))
-                  );
-                  Inputstatus::Insert(d, s) 
-                }
-                Inputstatus::Overwrite(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Rem(d.opp()))
-                  );
-                  Inputstatus::Overwrite(d, s) 
-                }
-                Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                  e.take_action(Action::Cmd(Command::Rem(Dir::L)));
-                  Inputstatus::EnterCursor(p,c,e)                  
-                }
-              };
-              needs_update = true;
+            Key::Down => {
+              if command_key_down {
+                println!("Mode: Insert");
+                status = match status {
+                  Inputstatus::Insert(d, s) | Inputstatus::Overwrite(d, s) => {
+                    Inputstatus::Insert(d, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,a) => {
+                    Inputstatus::EnterCursor(p,c,a)                  
+                  }
+                };
+              } else {
+                println!("{:?}", key)
+              }
             }
-          }
-          Key::Return => {
-            if command_key_down {println!("C: Return");}
-            else {
-              status = match status {
-                Inputstatus::Insert(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
-                  );
-                  Inputstatus::Insert(d, s)
-                }
-                Inputstatus::Overwrite(d, s) => {
-                  main_edit.take_action(
-                    Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
-                  );
-                  Inputstatus::Overwrite(d, s)
-                }
-                Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                  let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}));
-                  let newcommand = match c {
-                      CCs::Mk => {Command::Mk(content)}
-                      CCs::Switch => {Command::Switch(content)}
-                      CCs::Jmp => {Command::Jmp(content)}
-                      CCs::Join => {Command::Join(content)}
-                  };
-                  main_edit.take_action(Action::Cmd(newcommand));
-                  *p
-                }
-              };
-              needs_update = true;
+            Key::Left => {
+              if command_key_down {
+                println!("Mode: Left");
+                status = match status {
+                  Inputstatus::Insert(_, s) => {
+                    Inputstatus::Insert(Dir::L, s)
+                  }
+                  Inputstatus::Overwrite(_, s) => {
+                    Inputstatus::Overwrite(Dir::L, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,e) => {
+                    Inputstatus::EnterCursor(p,c,e)                  
+                  }
+                };
+              }
+              else{
+                status = match status {
+                  Inputstatus::Insert(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Move(Dir::L))
+                    );
+                    Inputstatus::Insert(d, s)
+                  }
+                  Inputstatus::Overwrite(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Move(Dir::L))
+                    );
+                    Inputstatus::Overwrite(d, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                    e.take_action(Action::Cmd(Command::Move(Dir::L)));
+                    Inputstatus::EnterCursor(p,c,e)                  
+                  }
+                };
+                needs_update = true;
+              }
             }
-          }
-          /*Undo*/Key::Z => {
-            if command_key_down {
-              let newstatus = match status {
-                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  main_edit.take_action(Action::Undo);
-                  status
-                }
-                Inputstatus::EnterCursor(p,cc,mut e @ _) => {
-                  e.take_action(Action::Undo);
-                  Inputstatus::EnterCursor(p,cc,e)
-                }
-              };
-              status = newstatus;
-              needs_update = true;
-            } else {continue}
-          }
-          /*Redo*/Key::Y => {
-            if command_key_down {
-              let newstatus = match status {
-                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  main_edit.take_action(Action::Redo);
-                  status
-                }
-                Inputstatus::EnterCursor(p,cc,mut e @ _) => {
-                  e.take_action(Action::Redo);
-                  Inputstatus::EnterCursor(p,cc,e)
-                }
-              };
-              status = newstatus;
-              needs_update = true;
-            } else {continue}
-          }
-          /*Mk*/ Key::M => {
-            if command_key_down{
+            Key::Right => {
+              if command_key_down {
+                println!("Mode: Right");
+                status = match status {
+                  Inputstatus::Insert(_, s) => {
+                    Inputstatus::Insert(Dir::R, s)
+                  }
+                  Inputstatus::Overwrite(_, s) => {
+                    Inputstatus::Overwrite(Dir::R, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,e) => {
+                    Inputstatus::EnterCursor(p,c,e)                  
+                  }
+                };
+              }
+              else{
+                status = match status {
+                  Inputstatus::Insert(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Move(Dir::R))
+                    );
+                    Inputstatus::Insert(d, s)
+                  }
+                  Inputstatus::Overwrite(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Move(Dir::R))
+                    );
+                    Inputstatus::Overwrite(d, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                    e.take_action(Action::Cmd(Command::Move(Dir::R)));
+                    Inputstatus::EnterCursor(p,c,e)                  
+                  }
+                };
+                needs_update = true;
+              }
+            }
+            /*Delete*/Key::D => {
+              if command_key_down {
+                status = match status {
+                  Inputstatus::Insert(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Rem(d.clone()))
+                    );
+                    Inputstatus::Insert(d, s)
+                  }
+                  Inputstatus::Overwrite(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Rem(d.clone()))
+                    );
+                    Inputstatus::Overwrite(d, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                    e.take_action(Action::Cmd(Command::Rem(Dir::R)));
+                    Inputstatus::EnterCursor(p,c,e)                  
+                  }
+                };
+                needs_update = true;
+              } else {continue}
+            }
+            Key::Backspace  => {
+              if command_key_down {println!("C: Backspace");}
+              else{
+                status = match status {
+                  Inputstatus::Insert(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Rem(d.opp()))
+                    );
+                    Inputstatus::Insert(d, s) 
+                  }
+                  Inputstatus::Overwrite(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Rem(d.opp()))
+                    );
+                    Inputstatus::Overwrite(d, s) 
+                  }
+                  Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                    e.take_action(Action::Cmd(Command::Rem(Dir::L)));
+                    Inputstatus::EnterCursor(p,c,e)                  
+                  }
+                };
+                needs_update = true;
+              }
+            }
+            Key::Return => {
+              if command_key_down {println!("C: Return");}
+              else {
+                status = match status {
+                  Inputstatus::Insert(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
+                    );
+                    Inputstatus::Insert(d, s)
+                  }
+                  Inputstatus::Overwrite(d, s) => {
+                    main_edit.take_action(
+                      Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
+                    );
+                    Inputstatus::Overwrite(d, s)
+                  }
+                  Inputstatus::EnterCursor(p,c,mut e @ _) => {
+                    let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}));
+                    let newcommand = match c {
+                        CCs::Mk => {Command::Mk(content)}
+                        CCs::Switch => {Command::Switch(content)}
+                        CCs::Jmp => {Command::Jmp(content)}
+                        CCs::Join => {Command::Join(content)}
+                    };
+                    main_edit.take_action(Action::Cmd(newcommand));
+                    *p
+                  }
+                };
+                needs_update = true;
+              }
+            }
+            /*Undo*/Key::Z => {
+              if command_key_down {
                 let newstatus = match status {
                   Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                    Inputstatus::EnterCursor(Box::new(status), CCs::Mk, SpecEditor::new(List::new()))
+                    main_edit.take_action(Action::Undo);
+                    status
+                  }
+                  Inputstatus::EnterCursor(p,cc,mut e @ _) => {
+                    e.take_action(Action::Undo);
+                    Inputstatus::EnterCursor(p,cc,e)
+                  }
+                };
+                status = newstatus;
+                needs_update = true;
+              } else {continue}
+            }
+            /*Redo*/Key::Y => {
+              if command_key_down {
+                let newstatus = match status {
+                  Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                    main_edit.take_action(Action::Redo);
+                    status
+                  }
+                  Inputstatus::EnterCursor(p,cc,mut e @ _) => {
+                    e.take_action(Action::Redo);
+                    Inputstatus::EnterCursor(p,cc,e)
+                  }
+                };
+                status = newstatus;
+                needs_update = true;
+              } else {continue}
+            }
+            /*Mk*/ Key::M => {
+              if command_key_down{
+                  let newstatus = match status {
+                    Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                      Inputstatus::EnterCursor(Box::new(status), CCs::Mk, SpecEditor::new(List::new()))
+                    }
+                    Inputstatus::EnterCursor(_,_,_) => {
+                      status
+                    }
+                  };
+                  status = newstatus;
+                  needs_update = true;
+              } else {continue}
+            }
+            /*Switch*/ Key::H => {
+              if command_key_down {
+                let newstatus = match status {
+                  Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                    Inputstatus::EnterCursor(Box::new(status), CCs::Switch, SpecEditor::new(List::new()))
                   }
                   Inputstatus::EnterCursor(_,_,_) => {
                     status
@@ -573,118 +639,105 @@ fn main() {
                 };
                 status = newstatus;
                 needs_update = true;
-            } else {continue}
-          }
-          /*Switch*/ Key::H => {
-            if command_key_down {
-              let newstatus = match status {
-                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Switch, SpecEditor::new(List::new()))
-                }
-                Inputstatus::EnterCursor(_,_,_) => {
-                  status
-                }
-              };
-              status = newstatus;
-              needs_update = true;
-           }else{continue}
-          } 
-          /*Jmp*/ Key::J => {
-            if command_key_down {
-              let newstatus = match status {
-                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, SpecEditor::new(List::new()))
-                }
-                Inputstatus::EnterCursor(_,_,_) => {
-                  status
-                }
-              };
-              status = newstatus;
-              needs_update = true;
-           }else{continue}
-          } 
-          /*Join*/ Key::N => {
-            if command_key_down {
-              let newstatus = match status {
-                Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                  Inputstatus::EnterCursor(Box::new(status), CCs::Join, SpecEditor::new(List::new()))
-                }
-                Inputstatus::EnterCursor(_,_,_) => {
-                  status
-                }
-              };
-              status = newstatus;
-              needs_update = true;
-           }else{continue}
-          } 
-          /*Show/hide cursors*/Key::S => {
-            if command_key_down{
-                status = match status {
-                  Inputstatus::Insert(d, s) => {
-                    Inputstatus::Insert(d, !s)
+             }else{continue}
+            } 
+            /*Jmp*/ Key::J => {
+              if command_key_down {
+                let newstatus = match status {
+                  Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                    Inputstatus::EnterCursor(Box::new(status), CCs::Jmp, SpecEditor::new(List::new()))
                   }
-                  Inputstatus::Overwrite(d, s) => {
-                    Inputstatus::Overwrite(d, !s)
-                  }
-                  Inputstatus::EnterCursor(p,c,e) => {
-                    Inputstatus::EnterCursor(p,c,e)
+                  Inputstatus::EnterCursor(_,_,_) => {
+                    status
                   }
                 };
+                status = newstatus;
                 needs_update = true;
-            } else {continue}
-          }
-          _ => {
-            if command_key_down {
-              println!("C: {:?}", key);
+             }else{continue}
+            } 
+            /*Join*/ Key::N => {
+              if command_key_down {
+                let newstatus = match status {
+                  Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                    Inputstatus::EnterCursor(Box::new(status), CCs::Join, SpecEditor::new(List::new()))
+                  }
+                  Inputstatus::EnterCursor(_,_,_) => {
+                    status
+                  }
+                };
+                status = newstatus;
+                needs_update = true;
+             }else{continue}
+            } 
+            /*Show/hide cursors*/Key::S => {
+              if command_key_down{
+                  status = match status {
+                    Inputstatus::Insert(d, s) => {
+                      Inputstatus::Insert(d, !s)
+                    }
+                    Inputstatus::Overwrite(d, s) => {
+                      Inputstatus::Overwrite(d, !s)
+                    }
+                    Inputstatus::EnterCursor(p,c,e) => {
+                      Inputstatus::EnterCursor(p,c,e)
+                    }
+                  };
+                  needs_update = true;
+              } else {continue}
+            }
+            _ => {
+              if command_key_down {
+                println!("C: {:?}", key);
+              }
             }
           }
         }
-      }
-      Event::Update(_) => {
-        if !needs_update {
-          match more_inputs_iter.next() {
-            Some(cmd) => {
-              main_edit.take_action(cmd.clone());
-              needs_update = true;
-            }
-            None => {
-              if !keep_open {break}
+        Event::Update(_) => {
+          if !needs_update {
+            match more_inputs_iter.next() {
+              Some(cmd) => {
+                main_edit.take_action(cmd.clone());
+                needs_update = true;
+              }
+              None => {
+                if !keep_open {break}
+              }
             }
           }
         }
-      }
-      Event::Render(args) => {
-        match status {
-          Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
-            if needs_update {
-              content_text = main_edit.get_lines(&ViewParams{
-                addcursor: true,
-                showcursors: s
-              });
-              let (_, csv) = main_edit.stats();
-              match outfile {
-                None => (),
-                Some(ref mut f) => {
-                  if let Err(e) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
-                    panic!("can't write to file");
+        Event::Render(args) => {
+          match status {
+            Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
+              if needs_update {
+                content_text = main_edit.get_lines(&ViewParams{
+                  addcursor: true,
+                  showcursors: s
+                });
+                let (_, csv) = main_edit.stats();
+                match outfile {
+                  None => (),
+                  Some(ref mut f) => {
+                    if let Err(e) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
+                      panic!("can't write to file");
+                    }
                   }
                 }
+                needs_update = false
               }
-              needs_update = false
+              let (stat, _) = main_edit.stats();            
+              gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time()));
             }
-            let (stat, _) = main_edit.stats();            
-            gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time()));
+            Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
+              let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
+              gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), &ct));
+            }
           }
-          Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
-            let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
-            gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), &ct));
-          }
+          
         }
-        
+        _ => {}
+
       }
-      _ => {}
+    }
 
     }
-  }
-
 }
