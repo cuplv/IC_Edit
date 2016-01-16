@@ -5,5 +5,8 @@
 # cargo test --verbose -- --nocapture
 # cargo bench --verbose
 
-# -n no cursors
+# cursors!
+# cargo run -- windowless -s 0 -c 300
+
+# -n means no cursors
 cargo run -- windowless -s 0 -c 300 -n

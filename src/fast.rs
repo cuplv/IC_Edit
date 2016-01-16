@@ -311,6 +311,7 @@ pub fn cmdz_of_actions
            },
            Action::Cmd(c) => {
              let z = Edit::insert_optnm(st, z, Dir2::Left, nm, c);
+             let z = Edit::clear_side(st, z, Dir2::Right);
              (z, None)
            }
          }},
@@ -402,7 +403,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn take_action(self: &mut Self, ac: Action) -> () {
     // XXX: Kyle and I don't know how to do this without cloning!
     // Done: Need to insert names and articulations into this list
-    // println!("take_action: {:?}", ac);
+    println!("take_action {}: {:?}", self.next_id, ac);
     let id = self.next_id ;
     self.next_id += 1 ;
     let nm = self.adapton_st.name_of_usize(id) ;

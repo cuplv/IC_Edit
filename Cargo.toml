@@ -17,3 +17,4 @@ pistoncore-glutin_window = "0.17.1"
 
 [dependencies.adapton]
 git = "https://github.com/cuplv/adapton.rust.git"
+# path = "/Users/hammer/adapton"
