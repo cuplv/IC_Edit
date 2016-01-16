@@ -181,8 +181,8 @@ pub fn pass_cursors
   let (z, obs) = Symz::observe(st, z, dir.clone()) ;
   match obs {
     None => z,
-    Some(Symbol::Data(_)) => { z },                
-    Some(Symbol::Cur(_)) => {                
+    Some(Symbol::Data(_)) => { z },
+    Some(Symbol::Cur(_)) => {
       let (z, success) = Symz::goto(st, z, dir.clone()) ;
       if success { return pass_cursors::<A,T,Symz>(st, z, dir) }
       else { z }
@@ -204,6 +204,7 @@ pub fn content_of_cmdz
         let tz = {
           let z = match cmd.clone() {
             Command::Switch(_) =>
+              // XXX: Do we need names/arts?
               Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
             _ => z.clone()
           };
@@ -217,61 +218,61 @@ pub fn content_of_cmdz
           Command::Ovr(_, dir) => pass_cursors::<A,Syms,Symz>(st, z, dir2_of_dir(&dir)),
           _ => z
         } ;
-        let (z, active) = match cmd {
+        let (z, nm, active) = match cmd {
 
           Command::Ins(data, dir) => {
-            let z = match nm {
-              Some(ref nm) => {
-                let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ;
-                let z = Symz::ins_cell(st, z, dir2_of_dir(&dir.opp()), nm.clone()) ;
-                let z = Symz::ins_name(st, z, dir2_of_dir(&dir.opp()), nm.clone()) ;
-                z
-              },
-              None => Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)),
-            } ;
-            (z, active)
+            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir).opp(), nm, Symbol::Data(data)) ;
+            (z, None, active)
           },
 
           Command::Rem(dir) => {
             let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
-            (z, active)
+            // XXX Return nm or None here?
+            (z, nm, active)
           },
 
           Command::Move(dir) => {
-            let (z, _) = Symz::goto(st, z, dir2_of_dir(&dir)) ;
-            (z, active)
+            let (z, _) = Symz::move_optnm(st, z, dir2_of_dir(&dir), nm) ;
+            (z, None, active)
           },
 
           Command::Ovr(data, dir) => {
             let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
-            let z = Symz::insert(st, z, dir2_of_dir(&dir.opp()), Symbol::Data(data)) ;
-            (z, active)
+            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir.opp()), nm, Symbol::Data(data)) ;
+            (z, None, active)
           },
-          Command::Mk(cursor)     => { let z = Symz::insert(st, z, Dir2::Left, Symbol::Cur(cursor)) ; (z, active) },
+          
+          Command::Mk(cursor) => {
+            let z = Symz::insert_optnm(st, z, Dir2::Left, nm, Symbol::Cur(cursor)) ;
+            (z, None, active)
+          },
 
-          Command::Join(cursor)   => { let z_new = Symz::empty(st);
-                                       let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-                                       match z_new {
-                                         None => (z, active),
-                                         Some(z) => (z, cursor),
-                                       }}
+          Command::Join(cursor) =>
+          { let z_new = Symz::empty(st);
+            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+            match z_new {
+              None => (z, None, active),
+              Some(z) => (z, None, cursor),
+            }},
 
-          Command::Switch(cursor) => { let z_new = Symz::empty(st);
-                                       let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-                                       match z_new {
-                                         None =>        (z, active),
-                                         Some(new_z) => (new_z, cursor),
-                                       }}
+          Command::Switch(cursor) => {
+            let z_new = Symz::empty(st);
+            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+            match z_new {
+              None =>        (z, None, active),
+              Some(new_z) => (new_z, None, cursor),
+            }},
 
-          Command::Jmp(cursor)    => { let z_new = Symz::empty(st);
-                                       let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-                                       match z_new {
-                                         None => (z, active),
-                                         Some(z) => {
-                                           let z = Symz::insert(st, z, Dir2::Left, Symbol::Cur(cursor));
-                                           (z, active)
-                                         }
-                                       }}
+          Command::Jmp(cursor) => {
+            let z_new = Symz::empty(st);
+            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+            match z_new {
+              None => (z, None, active),
+              Some(z) => {
+                let z = Symz::insert_optnm(st, z, Dir2::Left, nm, Symbol::Cur(cursor));
+                (z, None, active)
+              }
+            }},
         } ;
         (z, nm, active)
       },
@@ -301,22 +302,15 @@ pub fn cmdz_of_actions
        /* Leaf */ &|st, act, (z,nm)| {
          match act {
            Action::Undo => {
-             let (z,_) = Edit::goto(st, z, Dir2::Left);
-             (z,nm)
+             let (z,_) = Edit::move_optnm(st, z, Dir2::Left, nm);
+             (z,None)
            },                         
            Action::Redo => {
-             let (z,_) = Edit::goto(st, z, Dir2::Right);
-             (z,nm)
+             let (z,_) = Edit::move_optnm(st, z, Dir2::Right, nm);
+             (z,None)
            },
            Action::Cmd(c) => {
-             let z = match nm {
-               None => Edit::insert(st, z, Dir2::Left, c),
-               Some(nm) => {
-                 let z = Edit::insert(st, z, Dir2::Left, c) ;
-                 let z = Edit::ins_cell(st, z, Dir2::Left, nm.clone()) ;
-                 let z = Edit::ins_name(st, z, Dir2::Left, nm) ;
-                 z
-               }} ;
+             let z = Edit::insert_optnm(st, z, Dir2::Left, nm, c);
              (z, None)
            }
          }},
@@ -429,10 +423,11 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
     let acts = self.rev_actions.clone() ;
+    let iter_count = self.next_id.clone() ;
     let (time, cnt) =
       self.adapton_st.cnt(|st| { 
         let time = Duration::span(|| {
-          println!("-----");
+          println!("----- {}", iter_count);
           
           let (actiont, actiont_cnt) = st.cnt(|st| {
             let nm = st.name_of_string("tree_of_list".to_string()) ;
