@@ -13,7 +13,6 @@ const DEFAULT_HEIGHT: u32 = 800;
 
 // icedit -r / --reference
 // uses spec implementation without optimisations
-const DISABLE_ADAPTON: bool = false;
 
 // icedit test
 //see main() for full testing options
@@ -49,7 +48,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
 use piston::input::{Button, Event, Input, Key};
-use piston::window::{WindowSettings, NoWindow};
+use piston::window::WindowSettings;
 use editor_defs::*;
 use functional::List;
 use spec::SpecEditor;
@@ -134,7 +133,7 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
   acts
 }
 
-fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: Duration) {
+fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: Duration, s: &Inputstatus) {
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
   //main text
@@ -164,6 +163,29 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   text.draw(
     &clock, f, &c.draw_state,
     c.trans(px, py).transform,
+    g);
+  let (stat, cur) = match *s {
+    Inputstatus::Insert(ref d,ref show) => {
+      let stat = "I ";
+      let dir = match d { &Dir::L => "<- (c-arrows)", &Dir::R => "-> (c-arrows)" };
+      let cur = if *show { "Visible (c-s)"} else { "Invisible (c-s)"};
+      (stat.to_string() + &dir, cur.to_string())
+    }
+    Inputstatus::Overwrite(ref d,ref show) => {
+      let stat = "O ";
+      let dir = match d { &Dir::L => "<- (c-arrows)", &Dir::R => "-> (c-arrows)" };
+      let cur = if *show { "Visible (c-s)"} else { "Invisible (c-s)"};
+      (stat.to_string() + &dir, cur.to_string())
+    }
+    _ => ("".to_string(), "".to_string()) // should not happen
+  };
+  text.draw(
+    &stat, f, &c.draw_state,
+    c.trans(px, py+(size*1.5)).transform,
+    g); 
+  text.draw(
+    &cur, f, &c.draw_state,
+    c.trans(px, py+(size*3.0)).transform,
     g); 
 
 }
@@ -215,6 +237,7 @@ fn main() {
       -y --height=[height]            'initial editor height in pixels'
       -s --rnd_start=[rnd_start]      'number of random starting commands'
       -c --rnd_cmds=[rnd_cmds]        'number of random commands after start'
+      [hide_curs] -h --hide_curs      'hide cursors initially'
       [spec_only] -r --reference      'disable Adapton optimizations' ")
     .subcommand(clap::SubCommand::with_name("test")
       .about("test options")
@@ -224,6 +247,7 @@ fn main() {
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
         -f --outfile=[outfile]        'filename for testing output'
+        [hide_curs] -h --hide_curs    'hide cursors initially'
         [no_cursors] -n --no_cursors  'do not use cursors in random commands'
         [spec_only] -r --reference    'only test reference implementation'
         [fast_only] -a --adapton      'only test adapton implementation'
@@ -235,6 +259,7 @@ fn main() {
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
         -f --outfile=[outfile]        'filename for testing output'
+        [hide_curs] -h --hide_curs    'hide cursors initially'
         [no_cursors] -n --no_cursors  'do not use cursors in random commands'
         [spec_only] -r --reference    'only test reference implementation'
         [fast_only] -a --adapton      'only test adapton implementation' ")
@@ -255,6 +280,7 @@ fn main() {
   let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(if test {DEFAULT_RND_START} else {0});
   let rnd_adds = value_t!(test_args.value_of("rnd_cmds"), u32).unwrap_or(if test {DEFAULT_RND_CMDS} else {0});
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
+  let show_curs = !test_args.is_present("hide_curs");
   let no_cursors = test_args.is_present("no_cursors");
   let use_adapton = !test_args.is_present("spec_only");
   let use_spec = !test_args.is_present("fast_only");
@@ -275,7 +301,6 @@ fn main() {
 
   //loop data
   let mut main_edit: Box<EditorPipeline>;
-  let mut time = Duration::seconds(0);
   let mut needs_update = true;
   let more_inputs = rnd_inputs(rnd_adds, no_cursors).rev();
   let mut more_inputs_iter = more_inputs.iter();
@@ -303,7 +328,7 @@ fn main() {
   match outfile {
     None => (),
     Some(ref mut f) => {
-      if let Err(e) = writeln!(f, "##timestamp, {}, initial cmds", main_edit.csv_title_line()) {
+      if let Err(_) = writeln!(f, "##timestamp, {}, initial cmds", main_edit.csv_title_line()) {
         panic!("can't write to file");
       }
     }
@@ -313,15 +338,11 @@ fn main() {
     loop {
 
       //update content
-      content_text = main_edit.get_lines(&ViewParams{
-        addcursor: true,
-        showcursors: true
-      });
       let (_, csv) = main_edit.stats();
       match outfile {
         None => (),
         Some(ref mut f) => {
-          if let Err(e) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
+          if let Err(_) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
             panic!("can't write to file");
           }
         }
@@ -336,7 +357,6 @@ fn main() {
       match more_inputs_iter.next() {
         Some(cmd) => {
           main_edit.take_action(cmd.clone());
-          needs_update = true;
         }
         None => {
           break
@@ -346,7 +366,7 @@ fn main() {
 
     }
   }else{
-  // graphics
+    // graphics
     let window = try_create_window(x, y).unwrap();
     let mut gl = GlGraphics::new(OPEN_GL);
     let exe_directory = current_exe().unwrap().parent().unwrap().to_owned();
@@ -354,7 +374,7 @@ fn main() {
     
     // input
     let mut command_key_down = false;
-    let mut status = Inputstatus::Insert(Dir::R, true); // XXX showcursors command line flag
+    let mut status = Inputstatus::Insert(Dir::R, show_curs);
 
     for e in window.events().max_fps(60).ups(50) {
       match e {
@@ -720,7 +740,7 @@ fn main() {
                 match outfile {
                   None => (),
                   Some(ref mut f) => {
-                    if let Err(e) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
+                    if let Err(_) = writeln!(f, "{}, {}, {}", time::now().asctime(), csv, rnd_start) {
                       panic!("can't write to file");
                     }
                   }
@@ -728,7 +748,7 @@ fn main() {
                 needs_update = false
               }
               let (stat, _) = main_edit.stats();            
-              gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time()));
+              gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time(), &status));
             }
             Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
               let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
