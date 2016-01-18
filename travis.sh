@@ -5,8 +5,11 @@
 # cargo test --verbose -- --nocapture
 # cargo bench --verbose
 
-# cursors!
-# cargo run -- windowless -s 0 -c 300
+# Toggle this line to include extra well-formedness checking
+# (adds lots of extra overhead to Adapton, but catches naming errors early)
+export ADAPTON_CHECK_DCG=1
 
 # -n means no cursors
-cargo run -- windowless -s 0 -c 300 -n
+cargo run -- windowless -s 0 -c 500 -n
+
+cargo run -- windowless -s 0 -c 300
