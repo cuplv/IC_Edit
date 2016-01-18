@@ -204,7 +204,7 @@ pub fn content_of_cmdz
     let emp = Symz::empty(st);
     Cmds::fold_lr(
       st, cmds, (emp, None, "0".to_string()),
-      /* Leaf */ &|st, cmd, (z, nm, active) | {
+      /* Leaf */ &|st, cmd, (z, optnm, active) | {
         let tz = {
           let z = match cmd.clone() {
             Command::Switch(_) =>
@@ -212,7 +212,9 @@ pub fn content_of_cmdz
               Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
             _ => z.clone()
           };
-          Symz::get_tree(st, z, Dir2::Left)
+          let nm = st.name_of_string("Symz::get_tree".to_string()) ;
+          st.ns(nm, |st| 
+                Symz::get_tree(st, z, Dir2::Left) )
         } ;
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {
@@ -222,32 +224,32 @@ pub fn content_of_cmdz
           Command::Ovr(_, dir) => pass_cursors::<A,Syms,Symz>(st, z, dir2_of_dir(&dir)),
           _ => z
         } ;
-        let (z, nm, active) = match cmd {
+        let (z, optnm_next, active) : (_,Option<A::Name>,_) = match cmd {
 
           Command::Ins(data, dir) => {
-            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir).opp(), nm, Symbol::Data(data)) ;
+            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir).opp(), optnm, Symbol::Data(data)) ;
             (z, None, active)
           },
 
           Command::Rem(dir) => {
             let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
             // XXX Return nm or None here?
-            (z, nm, active)
+            (z, None, active)
           },
 
           Command::Move(dir) => {
-            let (z, _) = Symz::move_optnm(st, z, dir2_of_dir(&dir), nm) ;
+            let (z, _) = Symz::move_optnm(st, z, dir2_of_dir(&dir), optnm) ;
             (z, None, active)
           },
 
           Command::Ovr(data, dir) => {
             let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
-            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir.opp()), nm, Symbol::Data(data)) ;
+            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir.opp()), optnm, Symbol::Data(data)) ;
             (z, None, active)
           },
           
           Command::Mk(cursor) => {
-            let z = Symz::insert_optnm(st, z, Dir2::Left, nm, Symbol::Cur(cursor)) ;
+            let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor)) ;
             (z, None, active)
           },
 
@@ -273,21 +275,26 @@ pub fn content_of_cmdz
             match z_new {
               None => (z, None, active),
               Some(z) => {
-                let z = Symz::insert_optnm(st, z, Dir2::Left, nm, Symbol::Cur(cursor));
+                let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor));
                 (z, None, active)
               }
             }},
         } ;
-        (z, nm, active)
+        (z, optnm_next, active)
       },
       /* Bin  */ &|st, _, r| r,
 
       /* Name */ &|st, nm2, _, (z,nm1,active)| match nm1 {
-        None => (z, Some(nm2), active),
-        Some(_) =>
+        None => {
+          println!("*** content_of_cmdz: None {:?}", &nm2) ;
+          (z, Some(nm2), active)
+        },
+        Some(nm1) => {
           // XXXX FIX ME!
           //panic!("nominal ambiguity! Should we use {:?} or {:?} ?", nm1, nm2)
+          println!("*** content_of_cmdz: Some({:?}) {:?}", &nm1, &nm2) ;
           (z, Some(nm2), active)
+        }
       },
       )
   }
@@ -462,12 +469,14 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
 
           let (content, content_cnt) = st.cnt(|st|{
-            let (content, _, _) = content_of_cmdz::<
-              A,collection::Tree<A,Command,u32>            
-              ,collection::Tree<A,Symbol,u32>
-              ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
-              >(st, cmdt) ;
-            content }) ;
+            let nm = st.name_of_string("content_of_cmdz".to_string()) ;
+            st.ns(nm, |st| {
+              let (content, _, _) = content_of_cmdz::<
+                A,collection::Tree<A,Command,u32>            
+                ,collection::Tree<A,Symbol,u32>
+                ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
+                >(st, cmdt) ;
+              content }) }) ;
           
           println!("content: {:?} {:?}", content_cnt, content);
           
