@@ -179,14 +179,16 @@ pub fn pass_cursors
   (st: &mut A, z:Symz::State, dir:Dir2) -> Symz::State
 {
   // Todo-Now: XXX observe operation re-associates names
-  let (z, obs) = Symz::observe(st, z, dir.clone()) ;
+  let (_, obs) = Symz::observe(st, z.clone(), dir.clone()) ;
   match obs {
     None => z,
     Some(Symbol::Data(_)) => { z },
     Some(Symbol::Cur(_)) => {
       // Todo-Later goto operation does not insert new names
-      let (z, success) = Symz::goto(st, z, dir.clone()) ;
-      if success { return pass_cursors::<A,T,Symz>(st, z, dir) }
+      let (z, success) = Symz::move_optnm(st, z, dir.clone(), None) ;
+      if success {
+        return pass_cursors::<A,T,Symz>(st, z, dir)
+      }
       else { z }
     },
   }        
