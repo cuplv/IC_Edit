@@ -30,6 +30,7 @@ extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
 extern crate piston;
+#[macro_use]
 extern crate adapton;
 
 mod functional;
@@ -104,7 +105,7 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
   }
 
   let mut rnd_action = |rng: &mut ThreadRng|{//(&rng: Rng) -> Action {
-    match rng.gen_range(0, 200) {
+    match rng.gen_range(0, 100) {
       0 ... 19 => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
       20 ... 69 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
       70 ... 79 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
