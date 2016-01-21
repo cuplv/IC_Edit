@@ -2,9 +2,10 @@ use editor_defs::*;
 use std::fmt::{Debug};
 use std::hash::{Hash};
 use time::Duration;
+use std::rc::Rc;
 
 use functional;
-use adapton::adapton_sigs::Adapton;
+use adapton::adapton_sigs::*;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
 use adapton::collection_traits::Dir2;
@@ -14,6 +15,8 @@ use adapton::collection_algo::tree_of_list;
 use adapton::collection::List;
 use adapton::collection::Tree;
 use adapton::collection;
+use adapton::macros::* ;
+
 use std::ops::Add;
 use std::num::Zero;
 
@@ -200,23 +203,23 @@ pub fn content_of_cmdz
   ,Syms:TreeT<A,Symbol>
   ,Symz:ListEdit<A,Symbol,Syms>
   >
-  (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>, Cursor) {
+  (st: &mut A, cmds:Cmds::Tree, dummy:usize) -> (Symz::State, Option<A::Name>, Cursor) {
     let emp = Symz::empty(st);
     Cmds::fold_lr(
       st, cmds, (emp, None, "0".to_string()),
       /* Leaf */ &|st, cmd, (z, optnm, active) | {
-        let tz = {
-          let z = match cmd.clone() {
-            Command::Switch(_) =>
-              // XXX: Do we need names/arts?
-              Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
-            _ => z.clone()
-          };
-          let nm = st.name_of_string("Symz::get_tree".to_string()) ;
-          st.ns(nm, |st| 
-                Symz::get_tree(st, z, Dir2::Left) )
-        } ;
-        let info = tree_info::<A,Syms> (st, tz.clone() ) ;
+        // let tz = {
+        //   let z = match cmd.clone() {
+        //     Command::Switch(_) =>
+        //       // XXX: Do we need names/arts?
+        //       Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
+        //     _ => z.clone()
+        //   };
+        //   let nm = st.name_of_string("Symz::get_tree".to_string()) ;
+        //   st.ns(nm, |st| 
+        //         Symz::get_tree(st, z, Dir2::Left) )
+        // } ;
+        // let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
           Command::Rem(dir) |
@@ -253,32 +256,33 @@ pub fn content_of_cmdz
             (z, None, active)
           },
 
-          Command::Join(cursor) =>
-          { let z_new = Symz::empty(st);
-            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-            match z_new {
-              None => (z, None, active),
-              Some(z) => (z, None, cursor),
-            }},
+          // Command::Join(cursor) =>
+          // { let z_new = Symz::empty(st);
+          //   let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+          //   match z_new {
+          //     None => (z, None, active),
+          //     Some(z) => (z, None, cursor),
+          //   }},
 
-          Command::Switch(cursor) => {
-            let z_new = Symz::empty(st);
-            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-            match z_new {
-              None =>        (z, None, active),
-              Some(new_z) => (new_z, None, cursor),
-            }},
+          // Command::Switch(cursor) => {
+          //   let z_new = Symz::empty(st);
+          //   let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+          //   match z_new {
+          //     None =>        (z, None, active),
+          //     Some(new_z) => (new_z, None, cursor),
+          //   }},
 
-          Command::Jmp(cursor) => {
-            let z_new = Symz::empty(st);
-            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-            match z_new {
-              None => (z, None, active),
-              Some(z) => {
-                let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor));
-                (z, None, active)
-              }
-            }},
+          // Command::Jmp(cursor) => {
+          //   let z_new = Symz::empty(st);
+          //   let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+          //   match z_new {
+          //     None => (z, None, active),
+          //     Some(z) => {
+          //       let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor));
+          //       (z, None, active)
+          //     }
+          //   }},
+          _ => panic!("not handled")
         } ;
         (z, optnm_next, active)
       },
@@ -286,13 +290,13 @@ pub fn content_of_cmdz
 
       /* Name */ &|st, nm2, _, (z,nm1,active)| match nm1 {
         None => {
-          println!("*** content_of_cmdz: None {:?}", &nm2) ;
+          //println!("*** content_of_cmdz: None {:?}", &nm2) ;
           (z, Some(nm2), active)
         },
         Some(nm1) => {
           // XXXX FIX ME!
           //panic!("nominal ambiguity! Should we use {:?} or {:?} ?", nm1, nm2)
-          println!("*** content_of_cmdz: Some({:?}) {:?}", &nm1, &nm2) ;
+          //println!("*** content_of_cmdz: Some({:?}) {:?}", &nm1, &nm2) ;
           (z, Some(nm2), active)
         }
       },
@@ -418,7 +422,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let id = self.next_id ;
     self.next_id += 1 ;
     let nm = self.adapton_st.name_of_usize(id) ;
-    let (nm1,nm2) = self.adapton_st.name_fork(nm) ;    
+    let (nm1,nm2) = self.adapton_st.name_fork(nm) ;
     self.rev_actions = {
       let l   = self.rev_actions.clone() ;
       let l   = L::cons(&mut self.adapton_st, ac, l) ;
@@ -470,12 +474,12 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
 
           let (content, content_cnt) = st.cnt(|st|{
             let nm = st.name_of_string("content_of_cmdz".to_string()) ;
-            st.ns(nm, |st| {
-              let (content, _, _) = content_of_cmdz::<
-                A,collection::Tree<A,Command,u32>            
-                ,collection::Tree<A,Symbol,u32>
-                ,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>
-                >(st, cmdt) ;
+            st.ns(nm.clone(), |st| {
+              let dummy = 0 ; // XXX: Workaround for Rust macro issue
+              let nm_wrapper = st.name_of_string("content_of_cmdz".to_string()) ;
+              let (content, _, _) =
+                memo!(st, nm_wrapper =>>
+                content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>, cmdt:cmdt, dummy:dummy ) ;
               content }) }) ;
           
           println!("content: {:?} {:?}", content_cnt, content);
