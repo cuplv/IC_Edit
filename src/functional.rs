@@ -30,7 +30,7 @@ impl<T> List<T> {
   }
 
   pub fn empty(&self) -> bool {
-    if let Some(_) = self.head {true} else {false}
+    if let Some(_) = self.head {false} else {true}
   }
 
   pub fn append(&self, elem: T) -> List<T> {

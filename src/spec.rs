@@ -28,6 +28,7 @@ impl CommonStats for SpecStats {
 }
 
 pub struct SpecEditor {
+    next_id: usize,
     last_stats: SpecStats,
     actions: List<Action>,
 }
@@ -35,8 +36,9 @@ pub struct SpecEditor {
 impl SpecEditor {
   pub fn new(initial_actions: List<Action>) -> SpecEditor {
     SpecEditor{
+      next_id: 0,
       last_stats: SpecStats::new(),
-      actions: initial_actions,
+      actions: initial_actions.rev(),
     }
   }
 }
@@ -304,6 +306,9 @@ pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, mut stat: SpecStat
 
 impl EditorPipeline for SpecEditor {
   fn take_action(self: &mut Self, ac: Action) -> () {
+    println!("take_action {}: {:?}", self.next_id, ac);
+    self.next_id += 1 ;
+
     self.actions = self.actions.append(ac);
   }
 

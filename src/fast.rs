@@ -44,19 +44,31 @@ pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
   rev_actions: L::List,
 }
 
-pub fn list_of_list<A:Adapton,L:ListT<A,Action>>
-  (st: &mut A, l_in:functional::List<Action>) -> L::List
-{
-  let mut l_out = L::nil(st);
-  for x in l_in.rev().iter() { l_out = L::cons(st,x.clone(),l_out) }
-  return l_out
-}
-
 impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
   pub fn new(mut st: A, initial_actions: functional::List<Action>) -> AdaptEditor<A,L> {
-    let actions = list_of_list::<A,L>(&mut st, initial_actions) ;
+
+    let mut more_acs = initial_actions ;
+    let mut actions = L::nil(&mut st) ;
+    let mut id = 0 ;
+
+    loop {  
+      let ac = if let Some(a) = more_acs.head() {a.clone()} else {break} ;
+      let nm = st.name_of_usize(id) ;
+      let (nm1,nm2) = st.name_fork(nm) ;
+      actions = {
+        let l   = L::cons(&mut st, ac, actions) ;
+        let art = st.cell( nm1, l ) ;
+        let art = st.read_only( art ) ;
+        let l   = L::art(&mut st, art) ;
+        let l   = L::name(&mut st, nm2, l) ;
+        l
+      } ;
+      id += 1 ;
+      more_acs = more_acs.tail() ;
+    }
+
     AdaptEditor{
-      next_id: 0,
+      next_id: id,
       adapton_st: st,
       last_stats: AdaptonStats::new(),
       rev_actions: actions,
