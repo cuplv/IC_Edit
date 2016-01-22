@@ -339,6 +339,7 @@ fn main() {
     loop {
 
       //update content
+
       let (_, csv) = main_edit.stats();
       match outfile {
         None => (),
@@ -358,6 +359,10 @@ fn main() {
       match more_inputs_iter.next() {
         Some(cmd) => {
           main_edit.take_action(cmd.clone());
+          main_edit.get_lines(&ViewParams{
+            addcursor: true,
+            showcursors: false
+          });
         }
         None => {
           break
