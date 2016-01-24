@@ -51,7 +51,7 @@ impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
     let mut actions = L::nil(&mut st) ;
     let mut id = 0 ;
 
-    loop {  
+    loop {
       let ac = if let Some(a) = more_acs.head() {a.clone()} else {break} ;
       let nm = st.name_of_usize(id) ;
       let (nm1,nm2) = st.name_fork(nm) ;

@@ -153,12 +153,12 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   }
 
   //info section
-  let hud_bcolor = [0.2, 0.2, 0.2, 0.8];
-  let hud_back = [590.0, 5.0, 200.0, 200.0];
+  let hud_bcolor = [0.02, 0.02, 0.02, 0.8];
+  let hud_back = [590.0, 5.0, 200.0, 90.0];
   graphics::rectangle(hud_bcolor, hud_back, c.transform, g); // shaded background
   let size = 16.0;
   let mut text = graphics::Text::new(16);
-  text.color = [1.0, 0.0, 0.0, 1.0];
+  text.color = [0.5, 1.0, 0.5, 1.0];
   let (px,py) = (600.0, size*1.5);
   let clock = "Time(ms): ".to_string() + &time.num_milliseconds().to_string();
   text.draw(
