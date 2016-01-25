@@ -220,18 +220,19 @@ pub fn content_of_cmdz
     Cmds::fold_lr(
       st, cmds, (emp, None, "0".to_string()),
       /* Leaf */ &|st, cmd, (z, optnm, active) | {
-        // let tz = {
-        //   let z = match cmd.clone() {
-        //     Command::Switch(_) =>
-        //       // XXX: Do we need names/arts?
-        //       Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
-        //     _ => z.clone()
-        //   };
-        //   let nm = st.name_of_string("Symz::get_tree".to_string()) ;
-        //   st.ns(nm, |st| 
-        //         Symz::get_tree(st, z, Dir2::Left) )
-        // } ;
-        // let info = tree_info::<A,Syms> (st, tz.clone() ) ;
+        let tz = {
+          let z = match cmd.clone() {
+            Command::Switch(_) =>
+              // XXX: Do we need names/arts?
+              Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
+            _ => z.clone()
+          };
+          let nm = st.name_of_string("Symz::get_tree".to_string()) ;
+          // XXX Bug Hypothesis: Need to do this get_tree operation structurally, not nominally! In general, names *will* be re-associated in the tree throughout the dynamic extent of this Cmds::fold_lr call.
+          st.ns(nm, |st| 
+                Symz::get_tree(st, z, Dir2::Left) )
+        } ;
+        let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
           Command::Rem(dir) |
@@ -268,33 +269,33 @@ pub fn content_of_cmdz
             (z, None, active)
           },
 
-          // Command::Join(cursor) =>
-          // { let z_new = Symz::empty(st);
-          //   let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-          //   match z_new {
-          //     None => (z, None, active),
-          //     Some(z) => (z, None, cursor),
-          //   }},
+          Command::Join(cursor) =>
+          { let z_new = Symz::empty(st);
+            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+            match z_new {
+              None => (z, None, active),
+              Some(z) => (z, None, cursor),
+            }},
 
-          // Command::Switch(cursor) => {
-          //   let z_new = Symz::empty(st);
-          //   let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-          //   match z_new {
-          //     None =>        (z, None, active),
-          //     Some(new_z) => (new_z, None, cursor),
-          //   }},
+          Command::Switch(cursor) => {
+            let z_new = Symz::empty(st);
+            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+            match z_new {
+              None =>        (z, None, active),
+              Some(new_z) => (new_z, None, cursor),
+            }},
 
-          // Command::Jmp(cursor) => {
-          //   let z_new = Symz::empty(st);
-          //   let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-          //   match z_new {
-          //     None => (z, None, active),
-          //     Some(z) => {
-          //       let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor));
-          //       (z, None, active)
-          //     }
-          //   }},
-          _ => panic!("not handled")
+          Command::Jmp(cursor) => {
+            let z_new = Symz::empty(st);
+            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
+            match z_new {
+              None => (z, None, active),
+              Some(z) => {
+                let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor));
+                (z, None, active)
+              }
+            }},
+          //_ => panic!("not handled")
         } ;
         (z, optnm_next, active)
       },
