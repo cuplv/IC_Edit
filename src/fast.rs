@@ -149,9 +149,10 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
   }
 
 
-pub fn tree_info_rec<A:Adapton,T:TreeT<A,Symbol>>
+pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
   (st:&mut A, tree:T::Tree) -> ContentInfo
 {
+  st.structural(|st|{
   T::fold_up(
     st, tree,
     &|_|      ContentInfo::zero(),
@@ -165,18 +166,7 @@ pub fn tree_info_rec<A:Adapton,T:TreeT<A,Symbol>>
     },
     &|st,  _,l,r| (l + r),
     &|st,_,_,l,r| (l + r),
-    )
-}
-
-pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
-  (st:&mut A, tree:T::Tree) -> ContentInfo
-{
-  let nm = st.name_of_string("tree_info".to_string());
-  let (res, cnt) = st.cnt(|st|{
-    st.ns(nm, |st| tree_info_rec::<A,T>(st, tree) )
-  }) ;
-  //println!("tree_info: {:?} {:?}", cnt, res);
-  res
+    )})
 }
 
 pub fn dir2_of_dir (d:&Dir) -> Dir2 {
@@ -227,10 +217,8 @@ pub fn content_of_cmdz
               Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
             _ => z.clone()
           };
-          let nm = st.name_of_string("Symz::get_tree".to_string()) ;
           // XXX Bug Hypothesis: Need to do this get_tree operation structurally, not nominally! In general, names *will* be re-associated in the tree throughout the dynamic extent of this Cmds::fold_lr call.
-          st.ns(nm, |st| 
-                Symz::get_tree(st, z, Dir2::Left) )
+          st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
         } ;
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {

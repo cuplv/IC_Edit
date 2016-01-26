@@ -26,4 +26,4 @@
 # the switch '-n' means "no cursors"
 cargo run -- windowless -s 0 -c 1000 -n
 
-# cargo run -- windowless -s 0 -c 300
+cargo run -- windowless -s 0 -c 1000
