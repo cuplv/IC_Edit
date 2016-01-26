@@ -270,7 +270,7 @@ pub fn content_of_cmdz
               Some(z) => (z, None, cursor),
             }},
 
-          Command::Switch( cursor) => { // XXX: Todo-Now: Consider `cursor == active` case for other cursor commands.
+          Command::Switch( cursor) => { // XXX: This is still broken, unfortunately.
             if cursor == active { (z, None, active) } else {
             let z_new = Symz::empty(st);
             let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
