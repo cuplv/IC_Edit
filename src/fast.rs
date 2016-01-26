@@ -129,6 +129,9 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          else
          { None }
        },
+       // Todo-Sometime: Make a combinator for this (common case): The
+       // Name and Bin case are identical; avoid duplicate
+       // code-related errors across bug fixes.
        /* Name */ |st, _, _, l, r, (cur, symz)| {
          let li = tree_info::<A,T>(st, l.clone()) ;
          let ri = tree_info::<A,T>(st, r.clone()) ;
@@ -183,7 +186,6 @@ pub fn pass_cursors
   >
   (st: &mut A, z:Symz::State, dir:Dir2) -> Symz::State
 {
-  // Todo-Now: XXX observe operation re-associates names
   let (_, obs) = Symz::observe(st, z.clone(), dir.clone()) ;
   match obs {
     None => z,
@@ -217,7 +219,10 @@ pub fn content_of_cmdz
               Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
             _ => z.clone()
           };
-          // XXX Bug Hypothesis: Need to do this get_tree operation structurally, not nominally! In general, names *will* be re-associated in the tree throughout the dynamic extent of this Cmds::fold_lr call.
+          // Bug fix: Need to do this get_tree operation
+          // structurally, not nominally! In general, names *will* be
+          // re-associated in the tree throughout the dynamic extent
+          // of this Cmds::fold_lr call.
           st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
         } ;
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
@@ -265,13 +270,14 @@ pub fn content_of_cmdz
               Some(z) => (z, None, cursor),
             }},
 
-          Command::Switch(cursor) => {
+          Command::Switch( cursor) => { // XXX: Todo-Now: Consider `cursor == active` case for other cursor commands.
+            if cursor == active { (z, None, active) } else {
             let z_new = Symz::empty(st);
             let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
             match z_new {
               None =>        (z, None, active),
               Some(new_z) => (new_z, None, cursor),
-            }},
+            }}},
 
           Command::Jmp(cursor) => {
             let z_new = Symz::empty(st);
