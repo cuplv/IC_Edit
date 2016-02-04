@@ -1,10 +1,14 @@
-use editor_defs::*;
 use std::fmt::{Debug};
 use std::hash::{Hash};
-use time::Duration;
 use std::rc::Rc;
+use std::ops::Add;
+use std::num::Zero;
+use time::Duration;
+use std::fs::File;
 
+use editor_defs::*;
 use functional;
+use gm::GMLog;
 use adapton::adapton_sigs::*;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
@@ -16,9 +20,6 @@ use adapton::collection::List;
 use adapton::collection::Tree;
 use adapton::collection;
 use adapton::macros::* ;
-
-use std::ops::Add;
-use std::num::Zero;
 
 #[derive(Debug)]
 pub struct AdaptonStats {
@@ -457,6 +458,12 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
             st.ns(nm, |st| {
               tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)                
             })}) ;
+
+          //File::create("tree_out.gmv").unwrap();
+          {
+            let f = &mut File::create("tree_out.gmv").unwrap();
+            actiont.log_snapshot(st, f, None);
+          }
           
           println!("actiont: {:?} {:?}", actiont_cnt, actiont);
 
