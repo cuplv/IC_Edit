@@ -42,7 +42,7 @@ mod gm;
 mod coord;
 
 use std::env::current_exe;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use time::Duration;
 use glutin_window::GlutinWindow;
@@ -299,6 +299,16 @@ fn main() {
     .open(f)
     .unwrap()
   });
+
+  //let logfile = &mut File::open("tree_log.gmv").unwrap();
+  let mut logfile = &mut
+    OpenOptions::new()
+    .create(true)
+    .write(true)
+    .append(true)
+    .open("tree_out.gmv")
+    .unwrap();
+
   //TODO: the clap library supports this in param parsing
   //assert_eq!(use_adapton || use_spec, true);
 
@@ -360,11 +370,11 @@ fn main() {
       //add action
       match more_inputs_iter.next() {
         Some(cmd) => {
-          main_edit.take_action(cmd.clone());
+          main_edit.take_action(cmd.clone(), None);
           main_edit.get_lines(&ViewParams{
             addcursor: true,
             showcursors: false
-          });
+          }, None);
         }
         None => {
           break
@@ -391,15 +401,15 @@ fn main() {
           if t == "" || command_key_down {continue}
           status = match status {
             Inputstatus::Insert(d, s) => {
-              main_edit.take_action(Action::Cmd(Command::Ins(t,d.clone())));
+              main_edit.take_action(Action::Cmd(Command::Ins(t,d.clone())), None);
               Inputstatus::Insert(d, s)
             }
             Inputstatus::Overwrite(d, s) => {
-              main_edit.take_action(Action::Cmd(Command::Ovr(t,d.clone())));
+              main_edit.take_action(Action::Cmd(Command::Ovr(t,d.clone())), None);
               Inputstatus::Overwrite(d, s)
             }
             Inputstatus::EnterCursor(p,c,mut e @ _) => {
-              e.take_action(Action::Cmd(Command::Ins(t,Dir::R)));
+              e.take_action(Action::Cmd(Command::Ins(t,Dir::R)), None);
               Inputstatus::EnterCursor(p,c,e)
             }
           };
@@ -479,18 +489,18 @@ fn main() {
                 status = match status {
                   Inputstatus::Insert(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Move(Dir::L))
+                      Action::Cmd(Command::Move(Dir::L)), None
                     );
                     Inputstatus::Insert(d, s)
                   }
                   Inputstatus::Overwrite(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Move(Dir::L))
+                      Action::Cmd(Command::Move(Dir::L)), None
                     );
                     Inputstatus::Overwrite(d, s)
                   }
                   Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                    e.take_action(Action::Cmd(Command::Move(Dir::L)));
+                    e.take_action(Action::Cmd(Command::Move(Dir::L)), None);
                     Inputstatus::EnterCursor(p,c,e)                  
                   }
                 };
@@ -516,18 +526,18 @@ fn main() {
                 status = match status {
                   Inputstatus::Insert(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Move(Dir::R))
+                      Action::Cmd(Command::Move(Dir::R)), None
                     );
                     Inputstatus::Insert(d, s)
                   }
                   Inputstatus::Overwrite(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Move(Dir::R))
+                      Action::Cmd(Command::Move(Dir::R)), None
                     );
                     Inputstatus::Overwrite(d, s)
                   }
                   Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                    e.take_action(Action::Cmd(Command::Move(Dir::R)));
+                    e.take_action(Action::Cmd(Command::Move(Dir::R)), None);
                     Inputstatus::EnterCursor(p,c,e)                  
                   }
                 };
@@ -539,18 +549,18 @@ fn main() {
                 status = match status {
                   Inputstatus::Insert(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Rem(d.clone()))
+                      Action::Cmd(Command::Rem(d.clone())), None
                     );
                     Inputstatus::Insert(d, s)
                   }
                   Inputstatus::Overwrite(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Rem(d.clone()))
+                      Action::Cmd(Command::Rem(d.clone())), None
                     );
                     Inputstatus::Overwrite(d, s)
                   }
                   Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                    e.take_action(Action::Cmd(Command::Rem(Dir::R)));
+                    e.take_action(Action::Cmd(Command::Rem(Dir::R)), None);
                     Inputstatus::EnterCursor(p,c,e)                  
                   }
                 };
@@ -563,18 +573,18 @@ fn main() {
                 status = match status {
                   Inputstatus::Insert(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Rem(d.opp()))
+                      Action::Cmd(Command::Rem(d.opp())), None
                     );
                     Inputstatus::Insert(d, s) 
                   }
                   Inputstatus::Overwrite(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Rem(d.opp()))
+                      Action::Cmd(Command::Rem(d.opp())), None
                     );
                     Inputstatus::Overwrite(d, s) 
                   }
                   Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                    e.take_action(Action::Cmd(Command::Rem(Dir::L)));
+                    e.take_action(Action::Cmd(Command::Rem(Dir::L)), None);
                     Inputstatus::EnterCursor(p,c,e)                  
                   }
                 };
@@ -587,25 +597,25 @@ fn main() {
                 status = match status {
                   Inputstatus::Insert(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
+                      Action::Cmd(Command::Ins("\n".to_string(), d.clone())), None
                     );
                     Inputstatus::Insert(d, s)
                   }
                   Inputstatus::Overwrite(d, s) => {
                     main_edit.take_action(
-                      Action::Cmd(Command::Ins("\n".to_string(), d.clone()))
+                      Action::Cmd(Command::Ins("\n".to_string(), d.clone())), None
                     );
                     Inputstatus::Overwrite(d, s)
                   }
                   Inputstatus::EnterCursor(p,c,mut e @ _) => {
-                    let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}));
+                    let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}, None));
                     let newcommand = match c {
                         CCs::Mk => {Command::Mk(content)}
                         CCs::Switch => {Command::Switch(content)}
                         CCs::Jmp => {Command::Jmp(content)}
                         CCs::Join => {Command::Join(content)}
                     };
-                    main_edit.take_action(Action::Cmd(newcommand));
+                    main_edit.take_action(Action::Cmd(newcommand), None);
                     *p
                   }
                 };
@@ -616,11 +626,11 @@ fn main() {
               if command_key_down {
                 let newstatus = match status {
                   Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                    main_edit.take_action(Action::Undo);
+                    main_edit.take_action(Action::Undo, None);
                     status
                   }
                   Inputstatus::EnterCursor(p,cc,mut e @ _) => {
-                    e.take_action(Action::Undo);
+                    e.take_action(Action::Undo, None);
                     Inputstatus::EnterCursor(p,cc,e)
                   }
                 };
@@ -632,11 +642,11 @@ fn main() {
               if command_key_down {
                 let newstatus = match status {
                   Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
-                    main_edit.take_action(Action::Redo);
+                    main_edit.take_action(Action::Redo, None);
                     status
                   }
                   Inputstatus::EnterCursor(p,cc,mut e @ _) => {
-                    e.take_action(Action::Redo);
+                    e.take_action(Action::Redo, None);
                     Inputstatus::EnterCursor(p,cc,e)
                   }
                 };
@@ -727,7 +737,7 @@ fn main() {
           if !needs_update {
             match more_inputs_iter.next() {
               Some(cmd) => {
-                main_edit.take_action(cmd.clone());
+                main_edit.take_action(cmd.clone(), None);
                 needs_update = true;
               }
               None => {
@@ -743,7 +753,7 @@ fn main() {
                 content_text = main_edit.get_lines(&ViewParams{
                   addcursor: true,
                   showcursors: s
-                });
+                }, Some(logfile));
                 let (_, csv) = main_edit.stats();
                 match outfile {
                   None => (),
@@ -759,7 +769,7 @@ fn main() {
               gl.draw(args.viewport(), |c, g| render(c, g, &mut font, &content_text, stat.time(), &status));
             }
             Inputstatus::EnterCursor(_, ref cc, ref mut e @ _) => {
-              let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }));
+              let ct = firstline(&e.get_lines(&ViewParams{ addcursor: true, showcursors: false }, None));
               gl.draw(args.viewport(), |c, g| render_cursor(c, g, &mut font, cc.clone(), &ct));
             }
           }

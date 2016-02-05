@@ -2,6 +2,7 @@ use functional::List;
 use time::Duration;
 use editor_defs::*;
 use std::fmt::Debug;
+use std::fs::File;
 
 #[derive(Debug)]
 pub struct SpecStats {
@@ -305,14 +306,14 @@ pub fn makelines(before: &List<Symbol>, after: &List<Symbol>, mut stat: SpecStat
 }
 
 impl EditorPipeline for SpecEditor {
-  fn take_action(self: &mut Self, ac: Action) -> () {
+  fn take_action(self: &mut Self, ac: Action, log: Option<&mut File>) -> () {
     println!("take_action {}: {:?}", self.next_id, ac);
     self.next_id += 1 ;
 
     self.actions = self.actions.append(ac);
   }
 
-  fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String> {
+  fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> List<String> {
     let stat = SpecStats::new();
     let mut result = List::new();
     let time = Duration::span(|| {

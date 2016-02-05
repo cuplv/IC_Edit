@@ -1,6 +1,7 @@
 use functional::List;
 use time::Duration;
 use std::fmt::Debug;
+use std::fs::File;
 
 pub type Cursor = String;
 
@@ -74,8 +75,8 @@ impl<'a, S: CommonStats> CommonStats for &'a S {
 }
 
 pub trait EditorPipeline {
-  fn take_action(self: &mut Self, ac: Action) -> ();
-  fn get_lines(self: &mut Self, vp: &ViewParams) -> List<String>;
+  fn take_action(self: &mut Self, ac: Action, log: Option<&mut File>) -> ();
+  fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> List<String>;
   fn csv_title_line(self: &Self) -> String { "Unspecified Data:".to_string() }
   fn stats(self: &mut Self) -> (
     &CommonStats, // formal Stats

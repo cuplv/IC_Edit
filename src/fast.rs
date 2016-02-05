@@ -423,7 +423,7 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
 // }
 
 impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
-  fn take_action(self: &mut Self, ac: Action) -> () {
+  fn take_action(self: &mut Self, ac: Action, log: Option<&mut File>) -> () {
     // XXX: Kyle and I don't know how to do this without cloning!
     // Done: Need to insert names and articulations into this list
     println!("take_action {}: {:?}", self.next_id, ac);
@@ -443,11 +443,12 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   }
   
   //   fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<functional::List<Color,String>> {
-  fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<String> {
+  fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> functional::List<String> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
     let acts = self.rev_actions.clone() ;
     let iter_count = self.next_id.clone() ;
+    let mut log = log; // required to pass value into closure along with .take()
     let (time, cnt) =
       self.adapton_st.cnt(|st| { 
         let time = Duration::span(|| {
@@ -459,11 +460,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)                
             })}) ;
 
-          //File::create("tree_out.gmv").unwrap();
-          {
-            let f = &mut File::create("tree_out.gmv").unwrap();
-            actiont.log_snapshot(st, f, None);
-          }
+          if let Some(log) = log.take() {actiont.log_snapshot(st, log, None)};
           
           println!("actiont: {:?} {:?}", actiont_cnt, actiont);
 
