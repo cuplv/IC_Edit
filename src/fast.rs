@@ -429,16 +429,21 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     println!("take_action {}: {:?}", self.next_id, ac);
     let id = self.next_id ;
     self.next_id += 1 ;
-    let nm = self.adapton_st.name_of_usize(id) ;
-    let (nm1,nm2) = self.adapton_st.name_fork(nm) ;
-    self.rev_actions = {
-      let l   = self.rev_actions.clone() ;
-      let l   = L::cons(&mut self.adapton_st, ac, l) ;
-      let art = self.adapton_st.cell( nm1, l ) ;
-      let art = self.adapton_st.read_only( art ) ;
-      let l   =  L::art(&mut self.adapton_st, art) ;
-      let l   = L::name(&mut self.adapton_st, nm2, l) ;
-      l
+    let sparse_count = 2;
+    if self.next_id % sparse_count == 0 {
+      let nm = self.adapton_st.name_of_usize(id) ;
+      let (nm1,nm2) = self.adapton_st.name_fork(nm) ;
+      self.rev_actions = {
+        let l   = self.rev_actions.clone() ;
+        let l   = L::cons(&mut self.adapton_st, ac, l) ;
+        let art = self.adapton_st.cell( nm1, l ) ;
+        let art = self.adapton_st.read_only( art ) ;
+        let l   =  L::art(&mut self.adapton_st, art) ;
+        let l   = L::name(&mut self.adapton_st, nm2, l) ;
+        l
+      }
+    } else {
+      self.rev_actions = L::cons(&mut self.adapton_st, ac, self.rev_actions.clone()) ;
     }
   }
   
@@ -460,7 +465,6 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               tree_of_list::<A,Action,collection::Tree<A,Action,u32>,L>(st, Dir2::Right, acts)                
             })}) ;
 
-          if let Some(log) = log.take() {actiont.log_snapshot(st, log, None)};
           
           println!("actiont: {:?} {:?}", actiont_cnt, actiont);
 
@@ -481,6 +485,8 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               ListZipper::get_tree(st, cmdz, Dir2::Left)
             })}) ;
           
+          if let Some(log) = log.take() {cmdt.log_snapshot(st, log, None)};
+
           println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
 
           let (content, content_cnt) = st.cnt(|st|{
