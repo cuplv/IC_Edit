@@ -6,15 +6,15 @@ use std::rc::Rc;
 
 #[derive(Debug,PartialEq,Eq)]
 pub struct List<T> {
-  head: Link<T>,
+  pub head: Link<T>,
 }
 
-type Link<T> = Option<Rc<Node<T>>>;
+pub type Link<T> = Option<Rc<Node<T>>>;
 
 #[derive(Debug,PartialEq,Eq)]
-struct Node<T> {
-  elem: T,
-  next: Link<T>,
+pub struct Node<T> {
+  pub elem: T,
+  pub next: Link<T>,
 }
 
 pub struct Iter<'a, T:'a> {
@@ -172,3 +172,4 @@ mod test {
   }
 
 }
+

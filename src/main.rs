@@ -228,7 +228,49 @@ fn try_create_window(x: u32, y: u32) -> Result<GlutinWindow, String> {
     .build()
 }
 
-fn main() {
+use functional::Link;
+use functional::Node;
+use std::rc::Rc;
+
+// Pattern-matching:
+// match _ { pat1 => ..., pat2 => ... }
+// pat ::= x | ref pat
+
+//  pat : A
+// ---------------
+// ref pat : & A
+
+//   exp : A
+// ----------------
+//   & exp : & A
+
+enum Expr {
+  Leaf(u32),
+  Plus1(Rc<Expr>,Rc<Expr>),
+  Plus2(Box<Expr>,Box<Expr>),
+}
+
+fn myprint (list:&Link<&str>) {
+  match *list {
+    None => print!("null"),
+    Some(ref list) => {
+      let ref x = list.elem;
+      let ref y = list.next;
+      print!("{:?}::", x);
+      myprint(y);
+    }
+  }
+}
+
+fn main() {    
+  let nil   : Link<&str> = None;
+  let list1 : Link<&str> = Some(Rc::new(Node{elem:"1", next:nil}));
+  let list2 : Link<&str> = Some(Rc::new(Node{elem:"1", next:list1}));
+  let list3 : Link<&str> = Some(Rc::new(Node{elem:"+", next:list2}));
+  myprint(& list3);
+}
+
+fn main2() {
 
   //command-line
   let args = clap::App::new("IC_Edit")
