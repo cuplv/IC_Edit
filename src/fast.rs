@@ -430,7 +430,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let id = self.next_id ;
     self.next_id += 1 ;
     let sparse_count = 2;
-    if self.next_id % sparse_count == 0 {
+    if true { //self.next_id % sparse_count == 0 {
       let nm = self.adapton_st.name_of_usize(id) ;
       let (nm1,nm2) = self.adapton_st.name_fork(nm) ;
       self.rev_actions = {
@@ -485,8 +485,6 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               ListZipper::get_tree(st, cmdz, Dir2::Left)
             })}) ;
           
-          if let Some(log) = log.take() {cmdt.log_snapshot(st, log, None)};
-
           println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
 
           let (content, content_cnt) = st.cnt(|st|{
@@ -498,6 +496,8 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
                 memo!(st, nm_wrapper =>>
                 content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>, cmdt:cmdt, dummy:dummy ) ;
               content }) }) ;
+          
+          if let Some(log) = log.take() {content.log_snapshot(st, log, None)};
           
           println!("content: {:?} {:?}", content_cnt, content);
           

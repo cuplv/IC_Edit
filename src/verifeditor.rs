@@ -50,7 +50,7 @@ impl<A:Adapton,L:ListT<A,Action>>
       }
       Some(log) => {
         self.spec.take_action(ac.clone(), Some(log));
-        self.fast.take_action(ac, Some(log))                
+        self.fast.take_action(ac, Some(log))
       }
     }
   }
