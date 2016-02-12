@@ -305,7 +305,7 @@ fn main() {
     .create(true)
     .write(true)
     .append(true)
-    .open("tree_out.gmv")
+    .open("icedit_log.gmv")
     .unwrap();
 
   //TODO: the clap library supports this in param parsing
