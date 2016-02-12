@@ -42,7 +42,7 @@ mod gm;
 mod coord;
 
 use std::env::current_exe;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 use time::Duration;
 use glutin_window::GlutinWindow;
@@ -300,7 +300,6 @@ fn main() {
     .unwrap()
   });
 
-  //let logfile = &mut File::open("tree_log.gmv").unwrap();
   let mut logfile = &mut
     OpenOptions::new()
     .create(true)
