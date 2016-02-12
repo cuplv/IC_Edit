@@ -38,8 +38,8 @@ mod editor_defs;
 mod spec;
 mod fast;
 mod verifeditor;
-mod gm;
-mod coord;
+// mod gm;
+// mod coord;
 
 use std::env::current_exe;
 use std::fs::OpenOptions;

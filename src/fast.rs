@@ -8,7 +8,7 @@ use std::fs::File;
 
 use editor_defs::*;
 use functional;
-use gm::GMLog;
+use adapton::gm::GMLog;
 use adapton::adapton_sigs::*;
 use adapton::collection_traits::ListT;
 use adapton::collection_traits::TreeT;
@@ -210,7 +210,7 @@ pub fn content_of_cmdz
   ,Syms:TreeT<A,Symbol>
   ,Symz:ListEdit<A,Symbol,Syms>
   >
-  (st: &mut A, cmds:Cmds::Tree, dummy:usize) -> (Symz::State, Option<A::Name>, Cursor) {
+  (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>, Cursor) {
     let emp = Symz::empty(st);
     Cmds::fold_lr(
       st, cmds, (emp, None, "0".to_string()),
@@ -228,6 +228,10 @@ pub fn content_of_cmdz
           // of this Cmds::fold_lr call.
           st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
         } ;
+        //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
+        //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
+        tz.log_snapshot(st, None);
+
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
@@ -497,14 +501,13 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               let dummy = 0 ; // XXX: Workaround for Rust macro issue
               let nm_wrapper = st.name_of_string("content_of_cmdz".to_string()) ;
               let (content, _, _) =
-                memo!(st, nm_wrapper =>>
-                content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>, cmdt:cmdt, dummy:dummy ) ;
+                content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>(st, cmdt) ;
               content }) }) ;
           
           // log output
-          let msg = last_action.map(|ac| format!("last action: {:?}", ac));
-          let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
-          if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
+          //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
+          //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
+          //if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
           
           println!("content: {:?} {:?}", content_cnt, content);
           
