@@ -42,6 +42,7 @@ pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
   next_id: usize,
   adapton_st: A,
   last_stats: AdaptonStats,
+  last_action: Option<Action>,
   rev_actions: L::List,
 }
 
@@ -72,6 +73,7 @@ impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
       next_id: id,
       adapton_st: st,
       last_stats: AdaptonStats::new(),
+      last_action: None,
       rev_actions: actions,
     }
   }
@@ -427,6 +429,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     // XXX: Kyle and I don't know how to do this without cloning!
     // Done: Need to insert names and articulations into this list
     println!("take_action {}: {:?}", self.next_id, ac);
+    self.last_action = Some(ac.clone());
     let id = self.next_id ;
     self.next_id += 1 ;
     let sparse_count = 2;
@@ -453,6 +456,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let mut result = functional::List::new();
     let acts = self.rev_actions.clone() ;
     let iter_count = self.next_id.clone() ;
+    let last_action = self.last_action.clone() ;
     let mut log = log; // required to pass value into closure along with .take()
     let (time, cnt) =
       self.adapton_st.cnt(|st| { 
@@ -497,7 +501,10 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
                 content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>, cmdt:cmdt, dummy:dummy ) ;
               content }) }) ;
           
-          if let Some(log) = log.take() {content.log_snapshot(st, log, None)};
+          // log output
+          let msg = last_action.map(|ac| format!("last action: {:?}", ac));
+          let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
+          if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
           
           println!("content: {:?} {:?}", content_cnt, content);
           
