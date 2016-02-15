@@ -230,7 +230,7 @@ pub fn content_of_cmdz
         } ;
         //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
         //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
-        tz.log_snapshot(st, None);
+        //tz.log_snapshot(st, None);
 
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
         let z = match cmd.clone() {
