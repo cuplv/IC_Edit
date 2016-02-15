@@ -47,6 +47,13 @@ pub enum Command {
   Join(Cursor),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Cmdtype {
+  Ins, Ovr, Rem, Mov,
+  Make, Swch, Jump, Join,
+  Undo, Redo
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CCs {
   Mk, Switch, Jmp, Join

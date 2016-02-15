@@ -38,8 +38,7 @@ mod editor_defs;
 mod spec;
 mod fast;
 mod verifeditor;
-// mod gm;
-// mod coord;
+mod randompie;
 
 use std::env::current_exe;
 use std::fs::OpenOptions;
@@ -57,6 +56,7 @@ use functional::List;
 use spec::SpecEditor;
 use fast::AdaptEditor;
 use verifeditor::VerifEditor;
+use randompie::Random_pie;
 
 use adapton::adapton_sigs::Adapton;
 use adapton::engine::Engine;
@@ -78,18 +78,24 @@ fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
 }
 
-fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
-  use rand::{Rng, ThreadRng, thread_rng};
-  let mut rng = thread_rng();
+fn rnd_inputs(num: u32, seed: Option<usize>, dist:Random_pie, nc: bool) -> List<Action> {
+  use rand::{Rng, StdRng, SeedableRng};
+  let mut rng: StdRng = match seed {
+    None => StdRng::new().unwrap(),
+    Some(s) => {
+      let s: &[_] = &[s];
+      SeedableRng::from_seed(s)
+    }
+  };
   let mut cursor_count = 1;
   let mut acts = List::new();
 
-  fn rnd_cursor(rng: &mut ThreadRng, max_cursor: u32) -> Cursor {
+  fn rnd_cursor(rng: &mut StdRng, max_cursor: u32) -> Cursor {
     let rn: u32 = rng.gen_range(0, max_cursor);
     rn.to_string()
   };
 
-  fn rnd_char(rng: &mut ThreadRng) -> String {
+  fn rnd_char(rng: &mut StdRng) -> String {
     let ascii: u8 = match rng.gen_range(0, 20) {
       0 ... 4 => {32} //space
       5 ... 6 => {rng.gen_range(48,48+10)} //numbers
@@ -102,36 +108,35 @@ fn rnd_inputs(num: u32, nc: bool) -> List<Action> {
     }
   }
 
-  fn rnd_dir(rng: &mut ThreadRng) -> Dir {
+  fn rnd_dir(rng: &mut StdRng) -> Dir {
     if rng.gen_range(0,10) > 3 {Dir::R} else {Dir::L}
   }
 
-  let mut rnd_action = |rng: &mut ThreadRng|{//(&rng: Rng) -> Action {
-    match rng.gen_range(0, 110) {
-      0 ... 19 => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
-      20 ... 69 => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
-      70 ... 79 => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
-      80 ... 98 => {Action::Cmd(Command::Move(rnd_dir(rng)))}
-      _ => {
-        let r = if nc {10} else {rng.gen_range(0, 6)};
-        match r {
-          0 => {
-            cursor_count = cursor_count + 1;
-            Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
-          }
-          1 => {Action::Cmd(Command::Switch(rnd_cursor(rng, cursor_count)))}
-          2 => {Action::Cmd(Command::Jmp(rnd_cursor(rng, cursor_count)))}
-          3 => {Action::Cmd(Command::Join(rnd_cursor(rng, cursor_count)))}
-          4 => {Action::Redo}
-          _ => {Action::Undo}
-
-        }
+  let mut rnd_action = |rng: &mut StdRng, dist:Random_pie| {
+    let cmd = match nc {
+      false => dist.get_cmd_type(rng),
+      true => dist.no_cursors().get_cmd_type(rng)
+    };
+    match cmd {
+      Cmdtype::Ovr => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
+      Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
+      Cmdtype::Rem => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
+      Cmdtype::Mov => {Action::Cmd(Command::Move(rnd_dir(rng)))}
+      Cmdtype::Make => {
+        cursor_count = cursor_count + 1;
+        Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
       }
+      Cmdtype::Swch => {Action::Cmd(Command::Switch(rnd_cursor(rng, cursor_count)))}
+      Cmdtype::Jump => {Action::Cmd(Command::Jmp(rnd_cursor(rng, cursor_count)))}
+      Cmdtype::Join => {Action::Cmd(Command::Join(rnd_cursor(rng, cursor_count)))}
+      Cmdtype::Redo => {Action::Redo}
+      Cmdtype::Undo => {Action::Undo}
+
     }
   };
 
   for _ in 0..num {
-    acts = acts.append(rnd_action(&mut rng));
+    acts = acts.append(rnd_action(&mut rng, dist));
   }
   acts
 }
@@ -240,7 +245,9 @@ fn main() {
       -y --height=[height]            'initial editor height in pixels'
       -s --rnd_start=[rnd_start]      'number of random starting commands'
       -c --rnd_cmds=[rnd_cmds]        'number of random commands after start'
-      [hide_curs] -h --hide_curs      'hide cursors initially'
+      -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+      --rnd_seeds [start_seed] [cmds_seed] 'seed integers for random commands'
+      -h --hide_curs                  'hide cursors initially'
       [spec_only] -r --reference      'disable Adapton optimizations' ")
     .subcommand(clap::SubCommand::with_name("test")
       .about("test options")
@@ -249,21 +256,25 @@ fn main() {
         -y --height=[height]          'editor height in pixels'
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
+        -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+        --rnd_seeds [start_seed] [cmds_seed] 'seed integers for random commands'
         -f --outfile=[outfile]        'filename for testing output'
-        [hide_curs] -h --hide_curs    'hide cursors initially'
-        [no_cursors] -n --no_cursors  'do not use cursors in random commands'
+        -h --hide_curs                'hide cursors initially'
+        -n --no_cursors               'do not use cursors in random commands'
         [spec_only] -r --reference    'only test reference implementation'
         [fast_only] -a --adapton      'only test adapton implementation'
-        [keep_open] -o --keep_open    'do not exit the editor when testing is complete' ")
+        -o --keep_open                'do not exit the editor when testing is complete' ")
     )
     .subcommand(clap::SubCommand::with_name("windowless")
       .about("windowless options")
       .args_from_usage("\
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
+        -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+        --rnd_seeds [start_seed] [cmds_seed] 'seed integers for random commands'
         -f --outfile=[outfile]        'filename for testing output'
-        [hide_curs] -h --hide_curs    'hide cursors initially'
-        [no_cursors] -n --no_cursors  'do not use cursors in random commands'
+        -h --hide_curs                'hide cursors initially'
+        -n --no_cursors               'do not use cursors in random commands'
         [spec_only] -r --reference    'only test reference implementation'
         [fast_only] -a --adapton      'only test adapton implementation' ")
     )
@@ -282,6 +293,10 @@ fn main() {
   let y = value_t!(test_args.value_of("height"), u32).unwrap_or(if test {TEST_HEIGHT} else {DEFAULT_HEIGHT});
   let rnd_start = value_t!(test_args.value_of("rnd_start"), u32).unwrap_or(if test {DEFAULT_RND_START} else {0});
   let rnd_adds = value_t!(test_args.value_of("rnd_cmds"), u32).unwrap_or(if test {DEFAULT_RND_CMDS} else {0});
+  let start_seed = match value_t!(test_args.value_of("start_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
+  let cmds_seed = match value_t!(test_args.value_of("cmds_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
+  let rnd_dist = values_t!(test_args.values_of("rnd_dist"), u32).unwrap_or(vec![50, 20, 10, 20, 1, 1, 1, 1, 1, 1]);
+  let rnd_dist = Random_pie::new(rnd_dist);
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let show_curs = !test_args.is_present("hide_curs");
   let no_cursors = test_args.is_present("no_cursors");
@@ -314,7 +329,7 @@ fn main() {
   //loop data
   let mut main_edit: Box<EditorPipeline>;
   let mut needs_update = true;
-  let more_inputs = rnd_inputs(rnd_adds, no_cursors).rev();
+  let more_inputs = rnd_inputs(rnd_adds, cmds_seed, rnd_dist, no_cursors).rev();
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
 
@@ -322,18 +337,18 @@ fn main() {
   if test && use_adapton && use_spec {
     //println!("Preparing to perform dynamic verification ...");
     println!("Using VerifEditor::<Engine,_> ...");
-    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
+    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)))
   } else if use_adapton {
     println!("Using AdaptEditor::<Engine,_> ...");
-    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, no_cursors)))
+    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)))
   } else if false {
     // Seems to overrun the stack;
     // tried using `export RUST_MIN_STACK=20485760` on the command line to mitigate this, but it didn't help.
     println!("Using AdaptEditor::<Naive,_> ...");
-    main_edit = Box::new(AdaptEditor::<AdaptonFromScratch,adapton::collection::List<AdaptonFromScratch,Action>>::new(AdaptonFromScratch::new(), rnd_inputs(rnd_start, no_cursors)))
+    main_edit = Box::new(AdaptEditor::<AdaptonFromScratch,adapton::collection::List<AdaptonFromScratch,Action>>::new(AdaptonFromScratch::new(), rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)))
   } else {
     println!("Using SpecEditor ...");
-    main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, no_cursors)));
+    main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)));
   }
 
   // write csv file title
