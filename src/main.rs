@@ -78,7 +78,7 @@ fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
 }
 
-fn rnd_inputs(num: u32, seed: Option<usize>, dist:Random_pie, nc: bool) -> List<Action> {
+fn rnd_inputs(num: u32, seed: Option<usize>, dist:&Random_pie, nc: bool) -> List<Action> {
   use rand::{Rng, StdRng, SeedableRng};
   let mut rng: StdRng = match seed {
     None => StdRng::new().unwrap(),
@@ -136,7 +136,7 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:Random_pie, nc: bool) -> List<
   };
 
   for _ in 0..num {
-    acts = acts.append(rnd_action(&mut rng, dist));
+    acts = acts.append(rnd_action(&mut rng, &dist));
   }
   acts
 }
@@ -329,7 +329,7 @@ fn main() {
   //loop data
   let mut main_edit: Box<EditorPipeline>;
   let mut needs_update = true;
-  let more_inputs = rnd_inputs(rnd_adds, cmds_seed, rnd_dist, no_cursors).rev();
+  let more_inputs = rnd_inputs(rnd_adds, cmds_seed, &rnd_dist, no_cursors).rev();
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
 
@@ -337,18 +337,18 @@ fn main() {
   if test && use_adapton && use_spec {
     //println!("Preparing to perform dynamic verification ...");
     println!("Using VerifEditor::<Engine,_> ...");
-    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)))
+    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)))
   } else if use_adapton {
     println!("Using AdaptEditor::<Engine,_> ...");
-    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)))
+    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)))
   } else if false {
     // Seems to overrun the stack;
     // tried using `export RUST_MIN_STACK=20485760` on the command line to mitigate this, but it didn't help.
     println!("Using AdaptEditor::<Naive,_> ...");
-    main_edit = Box::new(AdaptEditor::<AdaptonFromScratch,adapton::collection::List<AdaptonFromScratch,Action>>::new(AdaptonFromScratch::new(), rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)))
+    main_edit = Box::new(AdaptEditor::<AdaptonFromScratch,adapton::collection::List<AdaptonFromScratch,Action>>::new(AdaptonFromScratch::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)))
   } else {
     println!("Using SpecEditor ...");
-    main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, start_seed, rnd_dist, no_cursors)));
+    main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)));
   }
 
   // write csv file title

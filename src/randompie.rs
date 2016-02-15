@@ -75,7 +75,7 @@ impl Random_pie {
     if val < self.join {return Cmdtype::Join};
     let val = val - self.join;
     if val < self.redo {return Cmdtype::Redo};
-    Cmdtype::Undo;
+    return Cmdtype::Undo;
   }
 }
 
