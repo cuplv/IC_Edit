@@ -86,6 +86,8 @@ pub struct ContentInfo {
   line_count:usize,
 }
 
+impl<A:Adapton> GMLog<A> for ContentInfo {}
+
 impl Add for ContentInfo {
   type Output=ContentInfo;
   fn add(self, rhs: Self) -> Self::Output {
