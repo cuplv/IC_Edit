@@ -228,6 +228,8 @@ pub fn content_of_cmdz
           // of this Cmds::fold_lr call.
           st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
         } ;
+
+        //log output
         //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
         //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
         //tz.log_snapshot(st, None);
@@ -504,7 +506,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
                 content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>(st, cmdt) ;
               content }) }) ;
           
-          // log output
+          //log output
           //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
           //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
           //if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
