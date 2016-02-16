@@ -1,7 +1,7 @@
 use rand::{Rng};
 use editor_defs::Cmdtype;
 
-pub struct Random_pie {
+pub struct RandomPie {
     ins: u32,
     ovr: u32,
     rem: u32,
@@ -14,7 +14,7 @@ pub struct Random_pie {
     undo: u32,
 }
 
-impl Random_pie {
+impl RandomPie {
   pub fn new(from_vals: Vec<u32>) -> Self {
     let ins = from_vals[0];
     let ovr = from_vals[1];
@@ -26,7 +26,7 @@ impl Random_pie {
     let join = from_vals[7];
     let redo = from_vals[8];
     let undo = from_vals[9];
-    Random_pie {
+    RandomPie {
       ins: ins,
       ovr: ovr,
       rem: rem,
@@ -40,7 +40,7 @@ impl Random_pie {
     }
   }
   pub fn no_cursors(&self) -> Self {
-    Random_pie{
+    RandomPie{
       ins: self.ins,
       ovr: self.ovr,
       rem: self.rem,

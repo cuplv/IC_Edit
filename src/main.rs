@@ -56,7 +56,7 @@ use functional::List;
 use spec::SpecEditor;
 use fast::AdaptEditor;
 use verifeditor::VerifEditor;
-use randompie::Random_pie;
+use randompie::RandomPie;
 
 use adapton::adapton_sigs::Adapton;
 use adapton::engine::Engine;
@@ -78,7 +78,7 @@ fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
 }
 
-fn rnd_inputs(num: u32, seed: Option<usize>, dist:&Random_pie, nc: bool) -> List<Action> {
+fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<Action> {
   use rand::{Rng, StdRng, SeedableRng};
   let mut rng: StdRng = match seed {
     None => StdRng::new().unwrap(),
@@ -112,7 +112,7 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:&Random_pie, nc: bool) -> List
     if rng.gen_range(0,10) > 3 {Dir::R} else {Dir::L}
   }
 
-  let mut rnd_action = |rng: &mut StdRng, dist:Random_pie| {
+  let mut rnd_action = |rng: &mut StdRng, dist:&RandomPie| {
     let cmd = match nc {
       false => dist.get_cmd_type(rng),
       true => dist.no_cursors().get_cmd_type(rng)
@@ -136,7 +136,7 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:&Random_pie, nc: bool) -> List
   };
 
   for _ in 0..num {
-    acts = acts.append(rnd_action(&mut rng, &dist));
+    acts = acts.append(rnd_action(&mut rng, dist));
   }
   acts
 }
@@ -246,7 +246,8 @@ fn main() {
       -s --rnd_start=[rnd_start]      'number of random starting commands'
       -c --rnd_cmds=[rnd_cmds]        'number of random commands after start'
       -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
-      --rnd_seeds [start_seed] [cmds_seed] 'seed integers for random commands'
+      --start_seed=[start_seed]       'seed integer for random initial commands'
+      --cmds_seed=[cmds_seed]         'seed integer for random additional commands'
       -h --hide_curs                  'hide cursors initially'
       [spec_only] -r --reference      'disable Adapton optimizations' ")
     .subcommand(clap::SubCommand::with_name("test")
@@ -257,7 +258,8 @@ fn main() {
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
         -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
-        --rnd_seeds [start_seed] [cmds_seed] 'seed integers for random commands'
+        --start_seed=[start_seed]     'seed integer for random initial commands'
+        --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -f --outfile=[outfile]        'filename for testing output'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
@@ -271,7 +273,8 @@ fn main() {
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
         -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
-        --rnd_seeds [start_seed] [cmds_seed] 'seed integers for random commands'
+        --start_seed=[start_seed]     'seed integer for random initial commands'
+        --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -f --outfile=[outfile]        'filename for testing output'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
@@ -296,7 +299,7 @@ fn main() {
   let start_seed = match value_t!(test_args.value_of("start_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
   let cmds_seed = match value_t!(test_args.value_of("cmds_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
   let rnd_dist = values_t!(test_args.values_of("rnd_dist"), u32).unwrap_or(vec![50, 20, 10, 20, 1, 1, 1, 1, 1, 1]);
-  let rnd_dist = Random_pie::new(rnd_dist);
+  let rnd_dist = RandomPie::new(rnd_dist);
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let show_curs = !test_args.is_present("hide_curs");
   let no_cursors = test_args.is_present("no_cursors");
@@ -315,6 +318,7 @@ fn main() {
     .unwrap()
   });
 
+  // this is being replaced by adapton logging
   let mut logfile = &mut
     OpenOptions::new()
     .create(true)
