@@ -72,7 +72,9 @@ impl<A:Adapton,L:ListT<A,Action>>
     lines_fast        
   }
 
-  fn csv_title_line(self: &Self) -> String { "editor, milliseconds".to_string() }
+  fn csv_title_line(self: &Self) -> String {
+    self.fast.csv_title_line()
+  }
 
   fn stats(self: &mut Self) -> (&CommonStats, String) {
     self.fast.stats()

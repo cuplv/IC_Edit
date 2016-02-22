@@ -1,6 +1,7 @@
 use functional::List;
 use time::Duration;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+use std::fmt;
 use std::fs::File;
 
 pub type Cursor = String;
@@ -57,6 +58,43 @@ pub enum Cmdtype {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CCs {
   Mk, Switch, Jmp, Join
+}
+
+impl Action {
+  pub fn simple_view(&self) -> &str {
+    match *self {
+      Action::Undo => "Undo",
+      Action::Redo => "Redo",
+      Action::Cmd(ref c) => c.simple_view()
+    }
+  }
+}
+
+impl Command {
+  pub fn simple_view(&self) -> &str {
+    match *self {
+      Command::Ins(_,_) => "Insert",
+      Command::Rem(_) => "Remove",
+      Command::Move(_) => "Move",
+      Command::Ovr(_,_) => "Overwrite",
+      Command::Mk(_) => "MakeCursor",
+      Command::Switch(_) => "Switch",
+      Command::Jmp(_) => "JumpTo",
+      Command::Join(_) => "Join",
+    }
+  }
+}
+
+impl Display for Action {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.simple_view())
+  }
+}
+
+impl Display for Command {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.simple_view())
+  }
 }
 
 pub type Zip<T> = (List<T>,List<T>);
