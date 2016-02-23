@@ -74,6 +74,16 @@ fn infix_to_postfix(expr: String) -> String {
 		stack.push(c);
 	    }
 	}
+	else if c=='(' {
+	    stack.push(c);
+	}
+	else if c==')' {
+	    let mut s_top = stack.pop().unwrap();
+	    while s_top != '(' {
+	        postfix_expr.push(s_top);
+		s_top = stack.pop().unwrap();
+	    }
+	}
     }
     //Append all the remaining operators to the postfix string
     while stack.len() > 0 {
