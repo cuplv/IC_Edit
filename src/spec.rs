@@ -30,7 +30,9 @@ impl CommonStats for SpecStats {
 
 pub struct SpecEditor {
     next_id: usize,
+    total_actions: usize,
     last_stats: SpecStats,
+    last_action: Option<Action>,
     actions: List<Action>,
 }
 
@@ -38,7 +40,9 @@ impl SpecEditor {
   pub fn new(initial_actions: List<Action>) -> SpecEditor {
     SpecEditor{
       next_id: 0,
+      total_actions: initial_actions.iter().count(),
       last_stats: SpecStats::new(),
+      last_action: None,
       actions: initial_actions.rev(),
     }
   }
@@ -309,6 +313,8 @@ impl EditorPipeline for SpecEditor {
   fn take_action(self: &mut Self, ac: Action, log: Option<&mut File>) -> () {
     println!("take_action {}: {:?}", self.next_id, ac);
     self.next_id += 1 ;
+    self.total_actions += 1 ;
+    self.last_action = Some(ac.clone());
 
     self.actions = self.actions.append(ac);
   }
@@ -326,10 +332,14 @@ impl EditorPipeline for SpecEditor {
     result
   }
 
-  fn csv_title_line(self: &Self) -> String { "editor, milliseconds".to_string() }
+  fn csv_title_line(self: &Self) -> String { "editor,action count,last action,milliseconds".to_string() }
 
   fn stats(self: &mut Self) -> (&CommonStats, String) {
-    (&self.last_stats, format!("Spec, {}", self.last_stats.gen_time.num_milliseconds()))
+    match self.last_action {
+      None => (&self.last_stats, format!("Spec,{},None,{}", self.total_actions, self.last_stats.gen_time.num_milliseconds())),
+      Some(ref a) => (&self.last_stats, format!("Spec,{},{},{}", self.total_actions, a, self.last_stats.gen_time.num_milliseconds())),
+    }
+    
   }
 
 }

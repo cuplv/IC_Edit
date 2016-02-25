@@ -43,12 +43,14 @@ pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
   adapton_st: A,
   last_stats: AdaptonStats,
   last_action: Option<Action>,
+  total_actions: usize,
   rev_actions: L::List,
 }
 
 impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
   pub fn new(mut st: A, initial_actions: functional::List<Action>) -> AdaptEditor<A,L> {
 
+    let count = initial_actions.iter().count();
     let mut more_acs = initial_actions ;
     let mut actions = L::nil(&mut st) ;
     let mut id = 0 ;
@@ -74,6 +76,7 @@ impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
       adapton_st: st,
       last_stats: AdaptonStats::new(),
       last_action: None,
+      total_actions: count,
       rev_actions: actions,
     }
   }
@@ -230,6 +233,8 @@ pub fn content_of_cmdz
           // of this Cmds::fold_lr call.
           st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
         } ;
+
+        //log output
         //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
         //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
         //tz.log_snapshot(st, None);
@@ -438,6 +443,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     self.last_action = Some(ac.clone());
     let id = self.next_id ;
     self.next_id += 1 ;
+    self.total_actions += 1 ;
     let sparse_count = 2;
     if true { //self.next_id % sparse_count == 0 {
       let nm = self.adapton_st.name_of_usize(id) ;
@@ -506,7 +512,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
                 content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>(st, cmdt) ;
               content }) }) ;
           
-          // log output
+          //log output
           //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
           //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
           //if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
@@ -515,7 +521,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           
           result = make_lines(st, vp, content) ;
         }) ;
-        time      
+        time
       }) ;
     println!("{:?}", cnt) ;
     
@@ -523,10 +529,13 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     result
   }
 
-  fn csv_title_line(self: &Self) -> String { "editor, milliseconds".to_string() }
+  fn csv_title_line(self: &Self) -> String { "editor,action count,last action,milliseconds".to_string() }
 
   fn stats(self: &mut Self) -> (&CommonStats, String) {
-    (&self.last_stats, format!("Fast, {}", self.last_stats.gen_time.num_milliseconds()))
+    match self.last_action {
+      None => (&self.last_stats, format!("Fast,{},None,{}", self.total_actions, self.last_stats.gen_time.num_milliseconds())),
+      Some(ref a) => (&self.last_stats, format!("Fast,{},{},{}", self.total_actions, a, self.last_stats.gen_time.num_milliseconds())),
+    }
   }
 
 }
