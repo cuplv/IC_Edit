@@ -511,9 +511,9 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               content }) }) ;
           
           //log output
-          //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
-          //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
-          //if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
+          // let msg = last_action.map(|ac| format!("last action: {:?}", ac));
+          // let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
+          // if let Some(log) = log.take() {content.log_snapshot(st, "cursor",msg)};
           
           println!("content: {:?} {:?}", content_cnt, content);
           
