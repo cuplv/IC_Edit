@@ -144,19 +144,21 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          { None }
        },
        // Todo-Sometime: Make a combinator for this (common case): The
-       // Name and Bin case are identical; avoid duplicate
+       // Name and Bin case are similar, except for name insertion; avoid duplicate
        // code-related errors across bug fixes.
-       /* Name */ |st, _, _, l, r, (cur, symz)| {
+       /* Name */ |st, nm, _, l, r, (cur, symz)| {
          let li = tree_info::<A,T>(st, l.clone()) ;
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
          {
            let symz = Symz::ins_tree(st, symz, Dir2::Right, r, Dir2::Left);
+           let symz = Symz::ins_name(st, symz, Dir2::Right, nm);
            return tree_focus::<A,T,Symz>(st, l, cur, symz)
          }
          else if ri.cursors.contains( &cur )
          {
            let symz = Symz::ins_tree(st, symz, Dir2::Left, l, Dir2::Right);
+           let symz = Symz::ins_name(st, symz, Dir2::Left, nm);
            return tree_focus::<A,T,Symz>(st, r, cur, symz)
          }
          else
@@ -547,7 +549,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     s1_create,s1_eval,s1_dirty,s1_clean,s1_stack,\
     s2_create,s2_eval,s2_dirty,s2_clean,s2_stack,\
     s3_create,s3_eval,s3_dirty,s3_clean,s3_stack,\
-    s4_create,s4_eval,s4_dirty,s4_clean,s4_stack,\
+    s4_create,s4_eval,s4_dirty,s4_clean,s4_stack\
     ".to_string()
   }
 
