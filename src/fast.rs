@@ -24,11 +24,19 @@ use adapton::macros::* ;
 #[derive(Debug)]
 pub struct AdaptonStats {
   gen_time: Duration,
+  stage1: Cnt,
+  stage2: Cnt,
+  stage3: Cnt,
+  stage4: Cnt,
 }
 impl AdaptonStats {
   pub fn new() -> AdaptonStats {
     AdaptonStats{
       gen_time: Duration::zero(),
+      stage1: Cnt::zero(),
+      stage2: Cnt::zero(),
+      stage3: Cnt::zero(),
+      stage4: Cnt::zero(),
     }
   }
 }
@@ -138,19 +146,21 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          { None }
        },
        // Todo-Sometime: Make a combinator for this (common case): The
-       // Name and Bin case are identical; avoid duplicate
+       // Name and Bin case are similar, except for name insertion; avoid duplicate
        // code-related errors across bug fixes.
-       /* Name */ |st, _, _, l, r, (cur, symz)| {
+       /* Name */ |st, nm, _, l, r, (cur, symz)| {
          let li = tree_info::<A,T>(st, l.clone()) ;
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
          {
            let symz = Symz::ins_tree(st, symz, Dir2::Right, r, Dir2::Left);
+           let symz = Symz::ins_name(st, symz, Dir2::Right, nm);
            return tree_focus::<A,T,Symz>(st, l, cur, symz)
          }
          else if ri.cursors.contains( &cur )
          {
            let symz = Symz::ins_tree(st, symz, Dir2::Left, l, Dir2::Right);
+           let symz = Symz::ins_name(st, symz, Dir2::Left, nm);
            return tree_focus::<A,T,Symz>(st, r, cur, symz)
          }
          else
@@ -466,6 +476,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> functional::List<String> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
+    let mut stats = (Cnt::zero(),Cnt::zero(),Cnt::zero(),Cnt::zero()); 
     let acts = self.rev_actions.clone() ;
     let iter_count = self.next_id.clone() ;
     let last_action = self.last_action.clone() ;
@@ -513,29 +524,50 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               content }) }) ;
           
           //log output
-          //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
-          //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
-          //if let Some(log) = log.take() {content.log_snapshot(st, log, msg)};
+          // let msg = last_action.map(|ac| format!("last action: {:?}", ac));
+          // let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
+          // if let Some(log) = log.take() {content.log_snapshot(st, "cursor",msg)};
           
           println!("content: {:?} {:?}", content_cnt, content);
           
           result = make_lines(st, vp, content) ;
+          stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt);
         }) ;
         time
       }) ;
     println!("{:?}", cnt) ;
     
+    let (a,b,c,d) = stats;
+    self.last_stats.stage1 = a.clone();
+    self.last_stats.stage2 = b.clone();
+    self.last_stats.stage3 = c.clone();
+    self.last_stats.stage4 = d.clone();
     self.last_stats.gen_time = time;
     result
   }
 
-  fn csv_title_line(self: &Self) -> String { "editor,action count,last action,milliseconds".to_string() }
+  fn csv_title_line(self: &Self) -> String {
+    "editor,action count,last action,milliseconds,\
+    s1_create,s1_eval,s1_dirty,s1_clean,s1_stack,\
+    s2_create,s2_eval,s2_dirty,s2_clean,s2_stack,\
+    s3_create,s3_eval,s3_dirty,s3_clean,s3_stack,\
+    s4_create,s4_eval,s4_dirty,s4_clean,s4_stack\
+    ".to_string()
+  }
 
   fn stats(self: &mut Self) -> (&CommonStats, String) {
-    match self.last_action {
-      None => (&self.last_stats, format!("Fast,{},None,{}", self.total_actions, self.last_stats.gen_time.num_milliseconds())),
-      Some(ref a) => (&self.last_stats, format!("Fast,{},{},{}", self.total_actions, a, self.last_stats.gen_time.num_milliseconds())),
-    }
+    let last_action = match self.last_action {
+      None => "None".to_string(),
+      Some( ref a) => format!("{}",a),
+    };
+    let (s1,s2,s3,s4) = (&self.last_stats.stage1,&self.last_stats.stage2,&self.last_stats.stage3,&self.last_stats.stage4);
+    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+      self.total_actions, last_action, self.last_stats.gen_time.num_milliseconds(),
+      s1.create, s1.eval, s1.dirty, s1.clean, s1.stack,
+      s2.create, s2.eval, s2.dirty, s2.clean, s2.stack,
+      s3.create, s3.eval, s3.dirty, s3.clean, s3.stack,
+      s4.create, s4.eval, s4.dirty, s4.clean, s4.stack
+    ))
   }
 
 }
