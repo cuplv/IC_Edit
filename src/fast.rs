@@ -151,14 +151,12 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree(st, symz, Dir2::Right, r, Dir2::Left);
-           let symz = Symz::ins_name(st, symz, Dir2::Right, nm);
+           let symz = Symz::ins_tree_optnm(st, symz, Dir2::Right, Some(nm), r, Dir2::Left);
            return tree_focus::<A,T,Symz>(st, l, cur, symz)
          }
          else if ri.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree(st, symz, Dir2::Left, l, Dir2::Right);
-           let symz = Symz::ins_name(st, symz, Dir2::Left, nm);
+           let symz = Symz::ins_tree_optnm(st, symz, Dir2::Left, Some(nm), l, Dir2::Right);
            return tree_focus::<A,T,Symz>(st, r, cur, symz)
          }
          else
