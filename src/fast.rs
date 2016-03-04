@@ -151,12 +151,12 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree_optnm(st, symz, Dir2::Right, Some(nm), r, Dir2::Left);
+           let symz = st.structural(|st| Symz::ins_tree_optnm(st, symz, Dir2::Right, Some(nm), r, Dir2::Left));
            return tree_focus::<A,T,Symz>(st, l, cur, symz)
          }
          else if ri.cursors.contains( &cur )
          {
-           let symz = Symz::ins_tree_optnm(st, symz, Dir2::Left, Some(nm), l, Dir2::Right);
+           let symz = st.structural(|st| Symz::ins_tree_optnm(st, symz, Dir2::Left, Some(nm), l, Dir2::Right));
            return tree_focus::<A,T,Symz>(st, r, cur, symz)
          }
          else
@@ -206,7 +206,7 @@ pub fn pass_cursors
     Some(Symbol::Data(_)) => { z },
     Some(Symbol::Cur(_)) => {
       // Todo-Later goto operation does not insert new names
-      let (z, success) = Symz::move_optnm(st, z, dir.clone(), None) ;
+      let (z, success) = Symz::shift(st, z, dir.clone()) ;
       if success {
         return pass_cursors::<A,T,Symz>(st, z, dir)
       }
@@ -344,11 +344,11 @@ pub fn cmdz_of_actions
        /* Leaf */ &|st, act, (z,nm)| {
          match act {
            Action::Undo => {
-             let (z,_) = Edit::move_optnm(st, z, Dir2::Left, nm);
+             let (z,_) = Edit::shift(st, z, Dir2::Left);
              (z,None)
            },                         
            Action::Redo => {
-             let (z,_) = Edit::move_optnm(st, z, Dir2::Right, nm);
+             let (z,_) = Edit::shift(st, z, Dir2::Right);
              (z,None)
            },
            Action::Cmd(c) => {
