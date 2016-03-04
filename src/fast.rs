@@ -5,6 +5,7 @@ use std::ops::Add;
 use std::num::Zero;
 use time::Duration;
 use std::fs::File;
+use std::cmp;
 
 use editor_defs::*;
 use functional;
@@ -107,7 +108,7 @@ impl Add for ContentInfo {
       cursors    : { let mut v = self.cursors.clone() ; v.append( &mut rhs.cursors.clone() ) ; v },
       data_count : self.data_count + rhs.data_count,
       line_count : self.line_count + rhs.line_count,
-      height: self.height + rhs.height + 1,
+      height: cmp::max(self.height, rhs.height) + 1,
     }
   }
 }
