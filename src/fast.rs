@@ -127,7 +127,7 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
          Symbol::Cur(ref c) if c == &cur => { Some(symz) },
          _ => None,
        },
-       /* Bin */ |st, _, l, r, (cur, symz)| {
+       /* Bin */ |st, _, l, r, (cur, symz)| { //panic!("boo!");
          let li = tree_info::<A,T>(st, l.clone()) ;
          let ri = tree_info::<A,T>(st, r.clone()) ;
          if li.cursors.contains( &cur )
@@ -230,7 +230,7 @@ pub fn content_of_cmdz
           let z = match cmd.clone() {
             Command::Switch(_) =>
               // XXX: Do we need names/arts?
-              Symz::insert(st, z.clone(), Dir2::Left, Symbol::Cur(active.clone())),
+              Symz::insert_optnm(st, z.clone(), Dir2::Left, optnm.clone(), Symbol::Cur(active.clone())),
             _ => z.clone()
           };
           // Bug fix: Need to do this get_tree operation
@@ -313,7 +313,8 @@ pub fn content_of_cmdz
         } ;
         (z, optnm_next, active)
       },
-      /* Bin  */ &|st, _, r| r,
+      /* Bin  */ &|st, _, r| { //panic!("Bin in command tree!");
+      r },
 
       /* Name */ &|st, nm2, _, (z,nm1,active)| match nm1 {
         None => {
@@ -523,8 +524,8 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           // let msg = last_action.map(|ac| format!("last action: {:?}", ac));
           // let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
           // if let Some(log) = log.take() {content.log_snapshot(st, "cursor",msg)};
-          
           println!("content: {:?} {:?}", content_cnt, content);
+          //if format!("{:?}", content).len() > 400 { panic!("bad content articulations")} ;
           
           result = make_lines(st, vp, content) ;
           stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt);
