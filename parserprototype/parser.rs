@@ -1,6 +1,5 @@
-use std::io;
 
-fn infix_to_postfix(expr: String) -> String {
+pub fn infix_to_postfix(expr: String) -> String {
 
     // Maintain a stack of operators and postfix string of operands
     let mut stack: Vec<char> = Vec::new();
@@ -92,7 +91,7 @@ fn infix_to_postfix(expr: String) -> String {
     return postfix_expr.iter().cloned().collect::<String>();;
 }
 
-fn postfix_parse(expr: String) -> i32{
+pub fn postfix_parse(expr: String) -> i32{
     //Maintain a stack of terminals
     let mut stack: Vec<i32> = Vec::new();    
 
@@ -126,12 +125,4 @@ fn postfix_parse(expr: String) -> i32{
     return stack.pop().unwrap();    
 }
 
-fn main() {
-    println!("Enter expression in infix format");
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).ok().expect("Failed to parse input");
-    let postfix_expr = infix_to_postfix(input);
-    println!("{}", postfix_parse(postfix_expr));
-
-}
 
