@@ -8,7 +8,7 @@ fn infix_to_postfix(expr: String) -> String {
 
     for c in expr.chars() {
 
-	if c>'0' && c<'9' {
+	if c>='0' && c<='9' {
 	    // Append terminal to postfix string
 	    postfix_expr.push(c);
         }
