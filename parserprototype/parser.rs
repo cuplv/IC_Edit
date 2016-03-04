@@ -98,7 +98,7 @@ fn postfix_parse(expr: String) -> i32{
 
     for c in expr.chars(){
         //Push terminals onto stack after type casting them to i32
-	if c>'0' && c<'9' {
+	if c>='0' && c<='9' {
 	    stack.push(c as i32 - '0' as i32);
         } 
 
