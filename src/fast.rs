@@ -547,9 +547,10 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           // if let Some(log) = log.take() {content.log_snapshot(st, "cursor",msg)};
           println!("content: {:?} {:?}", content_cnt, content);
           //if format!("{:?}", content).len() > 400 { panic!("bad content articulations")} ;
-          
+          println!("info:    {:?}", info);
+
           result = make_lines(st, vp, content) ;
-          stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt, info);
+          stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt, info);          
         }) ;
         time
       }) ;
