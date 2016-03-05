@@ -98,9 +98,10 @@ pub struct ContentInfo {
   cursors:Vec<Cursor>,
   data_count:usize,
   line_count:usize,
-  height:usize,
   name_count:usize,
   bin_count:usize,
+  size:usize,
+  height:usize,
 }
 
 impl<A:Adapton> GMLog<A> for ContentInfo {}
@@ -115,6 +116,7 @@ impl Add for ContentInfo {
       height: cmp::max(self.height, rhs.height),
       name_count: self.name_count + rhs.name_count,
       bin_count: self.bin_count + rhs.bin_count,
+      size: self.size + rhs.size,
     }
   }
 }
@@ -128,6 +130,7 @@ impl Zero for ContentInfo {
       height: 0,
       name_count: 0,
       bin_count: 0,
+      size: 0,
     }
   }
 }
@@ -189,14 +192,14 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
     &|_|      ContentInfo::zero(),
     &|_,leaf| {
       match leaf {
-        Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0, height:1, name_count:0, bin_count:0  },
+        Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0, height:1, name_count:0, bin_count:0, size:1  },
         Symbol::Data(ref string)
-          if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1, height:1, name_count:0, bin_count:0  },
-        Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:1, name_count:0, bin_count:0  },
+          if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1, height:1, name_count:0, bin_count:0, size:1  },
+        Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:1, name_count:0, bin_count:0, size:1  },
       }
     },
-    &|st,  _,l:ContentInfo,r:ContentInfo| {ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:cmp::max(l.height.clone(), r.height.clone())+1, name_count:0, bin_count:1 } + l + r },
-    &|st,_,_,l:ContentInfo,r:ContentInfo| {ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:cmp::max(l.height.clone(), r.height.clone())+1, name_count:1, bin_count:0 } + l + r },
+    &|st,  _,l:ContentInfo,r:ContentInfo| {ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:cmp::max(l.height.clone(), r.height.clone())+1, name_count:0, bin_count:1, size:1 } + l + r },
+    &|st,_,_,l:ContentInfo,r:ContentInfo| {ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:cmp::max(l.height.clone(), r.height.clone())+1, name_count:1, bin_count:0, size:1 } + l + r },
     )})
 }
 
