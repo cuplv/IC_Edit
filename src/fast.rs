@@ -112,7 +112,7 @@ impl Add for ContentInfo {
       cursors    : { let mut v = self.cursors.clone() ; v.append( &mut rhs.cursors.clone() ) ; v },
       data_count : self.data_count + rhs.data_count,
       line_count : self.line_count + rhs.line_count,
-      height: cmp::max(self.height, rhs.height) + 1,
+      height: cmp::max(self.height, rhs.height),
       name_count: self.name_count + rhs.name_count,
       bin_count: self.bin_count + rhs.bin_count,
     }
@@ -195,8 +195,8 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:1, name_count:0, bin_count:0  },
       }
     },
-    &|st,  _,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:0, name_count:0, bin_count:1 }),
-    &|st,_,_,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:0, name_count:1, bin_count:0 }),
+    &|st,  _,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:max(l.height, r.height)+1, name_count:0, bin_count:1 }),
+    &|st,_,_,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:max(l.height, r.height)+1, name_count:1, bin_count:0 }),
     )})
 }
 
