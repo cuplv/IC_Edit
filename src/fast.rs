@@ -217,6 +217,9 @@ pub fn pass_cursors
   }        
 }
 
+
+
+
 pub fn content_of_cmdz
   <A:Adapton
   ,Cmds:TreeT<A,Command>
@@ -248,6 +251,10 @@ pub fn content_of_cmdz
         //tz.log_snapshot(st, None);
 
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
+
+        //Symz::print_all(st, z.clone());
+        println!("name-cmd: {:?} {:?}", optnm, cmd);
+
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
           Command::Rem(dir) |
@@ -284,7 +291,7 @@ pub fn content_of_cmdz
             (z, None, active)
           },
 
-          Command::Join(cursor) =>
+          Command::Join(cursor) => // XXX: Join code does not use optnm
           { let z_new = Symz::empty(st);
             let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
             match z_new {
@@ -292,7 +299,7 @@ pub fn content_of_cmdz
               Some(z) => (z, None, cursor),
             }},
 
-          Command::Switch( cursor) => { // XXX: This is still broken, unfortunately.
+          Command::Switch( cursor) => {
             if cursor == active { (z, None, active) } else {
             let z_new = Symz::empty(st);
             let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
