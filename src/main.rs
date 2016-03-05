@@ -18,8 +18,8 @@ const DEFAULT_HEIGHT: u32 = 800;
 //see main() for full testing options
 const TEST_WIDTH: u32 = 800;
 const TEST_HEIGHT: u32 = 800;
-const DEFAULT_RND_START: u32 = 100;
-const DEFAULT_RND_CMDS: u32 = 10;
+const DEFAULT_RND_START: u32 = 0;
+const DEFAULT_RND_CMDS: u32 = 0;
 const DEFAULT_OUTFILE: Option<&'static str> = Some("testout.csv");
 
 extern crate time;
