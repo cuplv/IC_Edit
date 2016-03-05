@@ -5,6 +5,7 @@ use std::ops::Add;
 use std::num::Zero;
 use time::Duration;
 use std::fs::File;
+use std::cmp;
 
 use editor_defs::*;
 use functional;
@@ -28,6 +29,7 @@ pub struct AdaptonStats {
   stage2: Cnt,
   stage3: Cnt,
   stage4: Cnt,
+  info: ContentInfo,
 }
 impl AdaptonStats {
   pub fn new() -> AdaptonStats {
@@ -37,6 +39,7 @@ impl AdaptonStats {
       stage2: Cnt::zero(),
       stage3: Cnt::zero(),
       stage4: Cnt::zero(),
+      info: ContentInfo::zero(),
     }
   }
 }
@@ -95,6 +98,9 @@ pub struct ContentInfo {
   cursors:Vec<Cursor>,
   data_count:usize,
   line_count:usize,
+  height:usize,
+  name_count:usize,
+  bin_count:usize,
 }
 
 impl<A:Adapton> GMLog<A> for ContentInfo {}
@@ -106,6 +112,9 @@ impl Add for ContentInfo {
       cursors    : { let mut v = self.cursors.clone() ; v.append( &mut rhs.cursors.clone() ) ; v },
       data_count : self.data_count + rhs.data_count,
       line_count : self.line_count + rhs.line_count,
+      height: cmp::max(self.height, rhs.height) + 1,
+      name_count: self.name_count + rhs.name_count,
+      bin_count: self.bin_count + rhs.bin_count,
     }
   }
 }
@@ -116,6 +125,9 @@ impl Zero for ContentInfo {
       cursors    : vec![],
       data_count : 0,
       line_count : 0,
+      height: 0,
+      name_count: 0,
+      bin_count: 0,
     }
   }
 }
@@ -177,14 +189,14 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
     &|_|      ContentInfo::zero(),
     &|_,leaf| {
       match leaf {
-        Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0 },
+        Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0, height:1, name_count:0, bin_count:0  },
         Symbol::Data(ref string)
-          if string == "\n" => ContentInfo{ cursors:vec![],       data_count:0, line_count:1 },
-        Symbol::Data(string)  => ContentInfo{ cursors:vec![],       data_count:1, line_count:0 },
+          if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1, height:1, name_count:0, bin_count:0  },
+        Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:1, name_count:0, bin_count:0  },
       }
     },
-    &|st,  _,l,r| (l + r),
-    &|st,_,_,l,r| (l + r),
+    &|st,  _,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:0, name_count:0, bin_count:1 }),
+    &|st,_,_,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:0, name_count:1, bin_count:0 }),
     )})
 }
 
@@ -226,11 +238,11 @@ pub fn content_of_cmdz
   ,Syms:TreeT<A,Symbol>
   ,Symz:ListEdit<A,Symbol,Syms>
   >
-  (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>, Cursor) {
+  (st: &mut A, cmds:Cmds::Tree) -> (Symz::State, Option<A::Name>, Cursor, ContentInfo) {
     let emp = Symz::empty(st);
     Cmds::fold_lr(
-      st, cmds, (emp, None, "0".to_string()),
-      /* Leaf */ &|st, cmd, (z, optnm, active) | {
+      st, cmds, (emp, None, "0".to_string(), ContentInfo::zero()),
+      /* Leaf */ &|st, cmd, (z, optnm, active, _) | {
         let tz = {
           let z = match cmd.clone() {
             Command::Switch(_) =>
@@ -320,21 +332,21 @@ pub fn content_of_cmdz
             }},
           //_ => panic!("not handled")
         } ;
-        (z, optnm_next, active)
+        (z, optnm_next, active, info)
       },
       /* Bin  */ &|st, _, r| { //panic!("Bin in command tree!");
       r },
 
-      /* Name */ &|st, nm2, _, (z,nm1,active)| match nm1 {
+      /* Name */ &|st, nm2, _, (z,nm1,active,info)| match nm1 {
         None => {
           //println!("*** content_of_cmdz: None {:?}", &nm2) ;
-          (z, Some(nm2), active)
+          (z, Some(nm2), active, info)
         },
         Some(nm1) => {
           // XXXX FIX ME!
           //panic!("nominal ambiguity! Should we use {:?} or {:?} ?", nm1, nm2)
           //println!("*** content_of_cmdz: Some({:?}) {:?}", &nm1, &nm2) ;
-          (z, Some(nm2), active)
+          (z, Some(nm2), active, info)
         }
       },
       )
@@ -460,7 +472,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let id = self.next_id ;
     self.next_id += 1 ;
     self.total_actions += 1 ;
-    let sparse_count = 2;
+    let sparse_count = 5;
     if true { //self.next_id % sparse_count == 0 {
       let nm = self.adapton_st.name_of_usize(id) ;
       let (nm1,nm2) = self.adapton_st.name_fork(nm) ;
@@ -482,7 +494,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> functional::List<String> {
     self.last_stats.gen_time = Duration::zero();
     let mut result = functional::List::new();
-    let mut stats = (Cnt::zero(),Cnt::zero(),Cnt::zero(),Cnt::zero()); 
+    let mut stats = (Cnt::zero(),Cnt::zero(),Cnt::zero(),Cnt::zero(),ContentInfo::zero()); 
     let acts = self.rev_actions.clone() ;
     let iter_count = self.next_id.clone() ;
     let last_action = self.last_action.clone() ;
@@ -520,14 +532,14 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           
           println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
 
-          let (content, content_cnt) = st.cnt(|st|{
+          let ((content, info), content_cnt) = st.cnt(|st|{
             let nm = st.name_of_string("content_of_cmdz".to_string()) ;
             st.ns(nm.clone(), |st| {
               let dummy = 0 ; // XXX: Workaround for Rust macro issue
               let nm_wrapper = st.name_of_string("content_of_cmdz".to_string()) ;
-              let (content, _, _) =
+              let (content, _, _, info) =
                 content_of_cmdz::<A,collection::Tree<A,Command,u32>,collection::Tree<A,Symbol,u32>,ListZipper<A,Symbol,collection::Tree<A,Symbol,u32>,List<A,Symbol>>>(st, cmdt) ;
-              content }) }) ;
+              (content, info) }) }) ;
           
           //log output
           // let msg = last_action.map(|ac| format!("last action: {:?}", ac));
@@ -537,17 +549,18 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           //if format!("{:?}", content).len() > 400 { panic!("bad content articulations")} ;
           
           result = make_lines(st, vp, content) ;
-          stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt);
+          stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt, info);
         }) ;
         time
       }) ;
     println!("{:?}", cnt) ;
     
-    let (a,b,c,d) = stats;
+    let (a,b,c,d,e) = stats;
     self.last_stats.stage1 = a.clone();
     self.last_stats.stage2 = b.clone();
     self.last_stats.stage3 = c.clone();
     self.last_stats.stage4 = d.clone();
+    self.last_stats.info = e.clone();
     self.last_stats.gen_time = time;
     result
   }
@@ -557,7 +570,9 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     s1_create,s1_eval,s1_dirty,s1_clean,s1_stack,\
     s2_create,s2_eval,s2_dirty,s2_clean,s2_stack,\
     s3_create,s3_eval,s3_dirty,s3_clean,s3_stack,\
-    s4_create,s4_eval,s4_dirty,s4_clean,s4_stack\
+    s4_create,s4_eval,s4_dirty,s4_clean,s4_stack,\
+    cursor_cnt, data_cnt, line_cnt, tree_height,\
+    name_cnt, bin_cnt\
     ".to_string()
   }
 
@@ -566,13 +581,15 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
       None => "None".to_string(),
       Some( ref a) => format!("{}",a),
     };
-    let (s1,s2,s3,s4) = (&self.last_stats.stage1,&self.last_stats.stage2,&self.last_stats.stage3,&self.last_stats.stage4);
-    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    let (s1,s2,s3,s4,info) = (&self.last_stats.stage1,&self.last_stats.stage2,&self.last_stats.stage3,&self.last_stats.stage4,&self.last_stats.info);
+    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
       self.total_actions, last_action, self.last_stats.gen_time.num_milliseconds(),
       s1.create, s1.eval, s1.dirty, s1.clean, s1.stack,
       s2.create, s2.eval, s2.dirty, s2.clean, s2.stack,
       s3.create, s3.eval, s3.dirty, s3.clean, s3.stack,
-      s4.create, s4.eval, s4.dirty, s4.clean, s4.stack
+      s4.create, s4.eval, s4.dirty, s4.clean, s4.stack,
+      info.cursors.len(), info.data_count, info.line_count, info.height,
+      info.name_count, info.bin_count
     ))
   }
 
