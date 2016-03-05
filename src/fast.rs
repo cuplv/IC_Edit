@@ -195,8 +195,8 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
         Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:1, name_count:0, bin_count:0  },
       }
     },
-    &|st,  _,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:max(l.height, r.height)+1, name_count:0, bin_count:1 }),
-    &|st,_,_,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:max(l.height, r.height)+1, name_count:1, bin_count:0 }),
+    &|st,  _,l:ContentInfo,r:ContentInfo| {ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:cmp::max(l.height.clone(), r.height.clone())+1, name_count:0, bin_count:1 } + l + r },
+    &|st,_,_,l:ContentInfo,r:ContentInfo| {ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:cmp::max(l.height.clone(), r.height.clone())+1, name_count:1, bin_count:0 } + l + r },
     )})
 }
 
