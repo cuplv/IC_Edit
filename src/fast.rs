@@ -99,6 +99,8 @@ pub struct ContentInfo {
   data_count:usize,
   line_count:usize,
   height:usize,
+  name_count:usize,
+  bin_count:usize,
 }
 
 impl<A:Adapton> GMLog<A> for ContentInfo {}
@@ -111,6 +113,8 @@ impl Add for ContentInfo {
       data_count : self.data_count + rhs.data_count,
       line_count : self.line_count + rhs.line_count,
       height: cmp::max(self.height, rhs.height) + 1,
+      name_count: self.name_count + rhs.name_count,
+      bin_count: self.bin_count + rhs.bin_count,
     }
   }
 }
@@ -121,7 +125,9 @@ impl Zero for ContentInfo {
       cursors    : vec![],
       data_count : 0,
       line_count : 0,
-      height: 1,
+      height: 0,
+      name_count: 0,
+      bin_count: 0,
     }
   }
 }
@@ -183,14 +189,14 @@ pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
     &|_|      ContentInfo::zero(),
     &|_,leaf| {
       match leaf {
-        Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0, height:0 },
+        Symbol::Cur(cursor)   => ContentInfo{ cursors:vec![cursor], data_count:0, line_count:0, height:1, name_count:0, bin_count:0  },
         Symbol::Data(ref string)
-          if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1, height:0 },
-        Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:0 },
+          if string == "\n" => ContentInfo{ cursors:vec![], data_count:0, line_count:1, height:1, name_count:0, bin_count:0  },
+        Symbol::Data(string)  => ContentInfo{ cursors:vec![], data_count:1, line_count:0, height:1, name_count:0, bin_count:0  },
       }
     },
-    &|st,  _,l,r| (l + r),
-    &|st,_,_,l,r| (l + r),
+    &|st,  _,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:0, name_count:0, bin_count:1 }),
+    &|st,_,_,l,r| (l + r + ContentInfo{ cursors:vec![], data_count:0, line_count:0, height:0, name_count:1, bin_count:0 }),
     )})
 }
 
@@ -558,7 +564,8 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     s2_create,s2_eval,s2_dirty,s2_clean,s2_stack,\
     s3_create,s3_eval,s3_dirty,s3_clean,s3_stack,\
     s4_create,s4_eval,s4_dirty,s4_clean,s4_stack,\
-    cursor_cnt, data_cnt, line_cnt, tree_height\
+    cursor_cnt, data_cnt, line_cnt, tree_height,\
+    name_cnt, bin_cnt\
     ".to_string()
   }
 
@@ -568,13 +575,14 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
       Some( ref a) => format!("{}",a),
     };
     let (s1,s2,s3,s4,info) = (&self.last_stats.stage1,&self.last_stats.stage2,&self.last_stats.stage3,&self.last_stats.stage4,&self.last_stats.info);
-    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
       self.total_actions, last_action, self.last_stats.gen_time.num_milliseconds(),
       s1.create, s1.eval, s1.dirty, s1.clean, s1.stack,
       s2.create, s2.eval, s2.dirty, s2.clean, s2.stack,
       s3.create, s3.eval, s3.dirty, s3.clean, s3.stack,
       s4.create, s4.eval, s4.dirty, s4.clean, s4.stack,
-      info.cursors.len(), info.data_count, info.line_count, info.height
+      info.cursors.len(), info.data_count, info.line_count, info.height,
+      info.name_count, info.bin_count
     ))
   }
 
