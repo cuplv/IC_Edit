@@ -217,7 +217,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   let mut text = graphics::Text::new(16);
   text.color = [0.5, 1.0, 0.5, 1.0];
   let (px,py) = (600.0, size*1.5);
-  let clock = "Time(ns): ".to_string() + &time.to_string();
+  let clock = "Time(ms): ".to_string() + &((time as f32)/1000000 as f32).to_string();
   text.draw(
     &clock, f, &c.draw_state,
     c.trans(px, py).transform,
@@ -283,15 +283,15 @@ fn try_create_window(x: u32, y: u32) -> Result<GlutinWindow, String> {
     .build()
 }
 
-fn main() {
-  use std::thread;
-  use std::thread::JoinHandle;
-  let child =
-    thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { main2() });
-  child.unwrap().join();
-}
+// fn main() {
+//   use std::thread;
+//   use std::thread::JoinHandle;
+//   let child =
+//     thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { main2() });
+//   child.unwrap().join();
+// }
 
-fn main2() {
+fn main() {
 
   //command-line
   let args = clap::App::new("IC_Edit")
