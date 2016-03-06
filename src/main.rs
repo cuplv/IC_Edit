@@ -191,7 +191,7 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<
   acts
 }
 
-fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: Duration, s: &Inputstatus) {
+fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache, t: &List<String>, time: u64, s: &Inputstatus) {
   graphics::clear([0.0, 0.0, 0.0, 1.0], g);
 
   //main text
@@ -217,7 +217,7 @@ fn render(c: graphics::context::Context, g: &mut GlGraphics, f: &mut GlyphCache,
   let mut text = graphics::Text::new(16);
   text.color = [0.5, 1.0, 0.5, 1.0];
   let (px,py) = (600.0, size*1.5);
-  let clock = "Time(ms): ".to_string() + &time.num_milliseconds().to_string();
+  let clock = "Time(ns): ".to_string() + &time.to_string();
   text.draw(
     &clock, f, &c.draw_state,
     c.trans(px, py).transform,
@@ -454,7 +454,7 @@ fn main2() {
       //display stats
       {
         let (stat, _) = main_edit.stats();
-        println!("Milliseconds: {}", stat.time().num_milliseconds()); 
+        println!("Milliseconds: {}", stat.time()); 
       }
       //add action
       match more_inputs_iter.next() {

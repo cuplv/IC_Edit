@@ -6,7 +6,7 @@ use std::fs::File;
 
 #[derive(Debug)]
 pub struct SpecStats {
-  gen_time: Duration,
+  gen_time: u64,
   processed_cmds: u32,
   search_failures: u32,
   read_past_ends: u32,
@@ -15,7 +15,7 @@ pub struct SpecStats {
 impl SpecStats {
   pub fn new() -> SpecStats {
     SpecStats{
-      gen_time: Duration::zero(),
+      gen_time: 0,
       processed_cmds: 0,
       search_failures: 0,
       read_past_ends: 0,
@@ -23,7 +23,7 @@ impl SpecStats {
   }
 }
 impl CommonStats for SpecStats {
-  fn time(self: &Self) -> Duration {
+  fn time(self: &Self) -> u64 {
     self.gen_time
   }
 }
@@ -322,7 +322,7 @@ impl EditorPipeline for SpecEditor {
   fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> List<String> {
     let stat = SpecStats::new();
     let mut result = List::new();
-    let time = Duration::span(|| {
+    let time = measure_ns(|| {
       let ((before, after), stat) = build_content(&self.actions, stat);
       let (out, stat) = makelines(&before, &after, stat, vp.addcursor, vp.showcursors);
       self.last_stats = stat;
@@ -336,8 +336,8 @@ impl EditorPipeline for SpecEditor {
 
   fn stats(self: &mut Self) -> (&CommonStats, String) {
     match self.last_action {
-      None => (&self.last_stats, format!("Spec,{},None,{}", self.total_actions, self.last_stats.gen_time.num_milliseconds())),
-      Some(ref a) => (&self.last_stats, format!("Spec,{},{},{}", self.total_actions, a, self.last_stats.gen_time.num_milliseconds())),
+      None => (&self.last_stats, format!("Spec,{},None,{}", self.total_actions, self.last_stats.gen_time)),
+      Some(ref a) => (&self.last_stats, format!("Spec,{},{},{}", self.total_actions, a, self.last_stats.gen_time)),
     }
     
   }

@@ -3,7 +3,7 @@ use std::hash::{Hash};
 use std::rc::Rc;
 use std::ops::Add;
 use std::num::Zero;
-use time::Duration;
+use time::{self, Duration};
 use std::fs::File;
 use std::cmp;
 
@@ -24,7 +24,7 @@ use adapton::macros::* ;
 
 #[derive(Debug)]
 pub struct AdaptonStats {
-  gen_time: Duration,
+  gen_time: u64,
   stage1: Cnt,
   stage2: Cnt,
   stage3: Cnt,
@@ -34,7 +34,7 @@ pub struct AdaptonStats {
 impl AdaptonStats {
   pub fn new() -> AdaptonStats {
     AdaptonStats{
-      gen_time: Duration::zero(),
+      gen_time: 0,
       stage1: Cnt::zero(),
       stage2: Cnt::zero(),
       stage3: Cnt::zero(),
@@ -44,7 +44,7 @@ impl AdaptonStats {
   }
 }
 impl CommonStats for AdaptonStats {
-  fn time(self: &Self) -> Duration {
+  fn time(self: &Self) -> u64 {
     self.gen_time
   }
 }
@@ -457,15 +457,6 @@ fn make_lines<A:Adapton>(st: &mut A, vp: &ViewParams,
 }
 
 
-// macro_rules! namespace {
-//   ( $st:expr , $name:expr =>> $code:expr ) =>
-//   {{
-//     let nm = ($st).name_of_string( ($name).to_string() ) ;
-//     ($st).ns(nm, |st| {
-//       $code
-//     })}};
-// }
-
 impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
   fn take_action(self: &mut Self, ac: Action, log: Option<&mut File>) -> () {
     // XXX: Kyle and I don't know how to do this without cloning!
@@ -492,10 +483,10 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
       self.rev_actions = L::cons(&mut self.adapton_st, ac, self.rev_actions.clone()) ;
     }
   }
-  
+
   //   fn get_lines(self: &mut Self, vp: &ViewParams) -> functional::List<functional::List<Color,String>> {
   fn get_lines(self: &mut Self, vp: &ViewParams, log: Option<&mut File>) -> functional::List<String> {
-    self.last_stats.gen_time = Duration::zero();
+    self.last_stats.gen_time = 0;
     let mut result = functional::List::new();
     let mut stats = (Cnt::zero(),Cnt::zero(),Cnt::zero(),Cnt::zero(),ContentInfo::zero()); 
     let acts = self.rev_actions.clone() ;
@@ -504,7 +495,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let mut log = log; // required to pass value into closure along with .take()
     let (time, cnt) =
       self.adapton_st.cnt(|st| { 
-        let time = Duration::span(|| {
+        let time = measure_ns(|| {
           println!("----- {}", iter_count);
           
           let (actiont, actiont_cnt) = st.cnt(|st| {
@@ -587,7 +578,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     };
     let (s1,s2,s3,s4,info) = (&self.last_stats.stage1,&self.last_stats.stage2,&self.last_stats.stage3,&self.last_stats.stage4,&self.last_stats.info);
     (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-      self.total_actions, last_action, self.last_stats.gen_time.num_milliseconds(),
+      self.total_actions, last_action, self.last_stats.gen_time,
       s1.create, s1.eval, s1.dirty, s1.clean, s1.stack,
       s2.create, s2.eval, s2.dirty, s2.clean, s2.stack,
       s3.create, s3.eval, s3.dirty, s3.clean, s3.stack,

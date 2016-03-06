@@ -1,5 +1,5 @@
 use functional::List;
-use time::Duration;
+use time::{self, Duration};
 use std::fmt::{Debug, Display};
 use std::fmt;
 use std::fs::File;
@@ -106,7 +106,7 @@ pub struct ViewParams {
 }
 
 pub trait CommonStats {
-  fn time(self: &Self) -> Duration;
+  fn time(self: &Self) -> u64;
 }
 // impl<S: CommonStats> CommonStats for Box<S> {
 //   fn time(self: &Self) -> Duration {
@@ -114,7 +114,7 @@ pub trait CommonStats {
 //   }
 // }
 impl<'a, S: CommonStats> CommonStats for &'a S {
-  fn time(self: &Self) -> Duration {
+  fn time(self: &Self) -> u64 {
     (**self).time()
   }
 }
@@ -132,4 +132,13 @@ pub trait EditorPipeline {
 pub trait StatProvider<S: CommonStats> {
   fn all_stats(self: &mut Self) -> S; 
 }
+
+pub fn measure_ns<F:FnOnce()>(f: F) -> u64 {
+  let start = time::precise_time_ns();
+  f();
+  let end = time::precise_time_ns();
+  end - start
+}
+
+
 

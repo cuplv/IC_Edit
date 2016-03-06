@@ -24,17 +24,17 @@ impl<A:Adapton,L:ListT<A,Action>> VerifEditor<A,L> {
 
 #[derive(Debug)]
 pub struct VeriStats {
-  gen_time: Duration,
+  gen_time: u64,
 }
 impl VeriStats {
   pub fn new() -> VeriStats {
   VeriStats{
-    gen_time: Duration::zero(),
+    gen_time: 0,
   }
   }
 }
 impl CommonStats for VeriStats {
-  fn time(self: &Self) -> Duration {
+  fn time(self: &Self) -> u64 {
   self.gen_time
   }
 }
