@@ -261,6 +261,7 @@ fn main() {
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -f --outfile=[outfile]        'filename for testing output'
+        -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
         [spec_only] -r --reference    'only test reference implementation'
@@ -276,6 +277,7 @@ fn main() {
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -f --outfile=[outfile]        'filename for testing output'
+        -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
         [spec_only] -r --reference    'only test reference implementation'
@@ -305,6 +307,10 @@ fn main() {
   let no_cursors = test_args.is_present("no_cursors");
   let use_adapton = !test_args.is_present("spec_only");
   let use_spec = !test_args.is_present("fast_only");
+  let test_tag = match test_args.value_of("test_tag") {
+    None => "default",
+    Some(t) => t
+  };
   let outfile = match test_args.value_of("outfile") {
     None => if test {DEFAULT_OUTFILE} else {None},
     Some(f) => Some(f)
@@ -359,7 +365,7 @@ fn main() {
   match outfile {
     None => (),
     Some(ref mut f) => {
-      if let Err(_) = writeln!(f, "##timestamp,{}", main_edit.csv_title_line()) {
+      if let Err(_) = writeln!(f, "##timestamp,user_tag,{}", main_edit.csv_title_line()) {
         panic!("can't write to file");
       }
     }
@@ -374,7 +380,7 @@ fn main() {
       match outfile {
         None => (),
         Some(ref mut f) => {
-          if let Err(_) = writeln!(f, "{},{}", time::now().asctime(), csv) {
+          if let Err(_) = writeln!(f, "{},{},{}", time::now().asctime(), test_tag, csv) {
             panic!("can't write to file");
           }
         }
@@ -776,7 +782,7 @@ fn main() {
                 match outfile {
                   None => (),
                   Some(ref mut f) => {
-                    if let Err(_) = writeln!(f, "{},{}", time::now().asctime(), csv) {
+                    if let Err(_) = writeln!(f, "{},{},{}", time::now().asctime(), test_tag, csv) {
                       panic!("can't write to file");
                     }
                   }
