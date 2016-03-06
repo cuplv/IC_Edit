@@ -268,7 +268,7 @@ pub fn content_of_cmdz
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
 
         //Symz::print_all(st, z.clone());
-        println!("name-cmd: {:?} {:?}", optnm, cmd);
+        //println!("name-cmd: {:?} {:?}", optnm, cmd);
 
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
