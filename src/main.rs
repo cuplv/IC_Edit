@@ -43,6 +43,7 @@ mod randompie;
 use std::env::current_exe;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use rand::{Rng, StdRng, SeedableRng};
 use time::Duration;
 use glutin_window::GlutinWindow;
 use graphics::Transformed;
@@ -78,8 +79,74 @@ fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
 }
 
-fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<Action> {
+fn user_inputs(users: u32, num: u32, seed: Option<usize>, dist:&RandomPie) -> List<Action> {
   use rand::{Rng, StdRng, SeedableRng};
+  let mut rng: StdRng = match seed {
+    None => StdRng::new().unwrap(),
+    Some(s) => {
+      let s: &[_] = &[s];
+      SeedableRng::from_seed(s)
+    }
+  };
+  let dist = dist.no_cursors();
+  let mut acts = List::new();
+
+  for u in 1..users {
+    acts = acts.append(Action::Cmd(Command::Mk(u.to_string())))
+  }
+
+  fn user_action(rng: &mut StdRng, dist:&RandomPie) -> Action {
+    match dist.get_cmd_type(rng) {
+      Cmdtype::Ovr => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
+      Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
+      Cmdtype::Rem => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
+      Cmdtype::Mov => {Action::Cmd(Command::Move(rnd_dir(rng)))}
+      Cmdtype::Make |
+      Cmdtype::Swch |
+      Cmdtype::Jump |
+      Cmdtype::Join => panic!("impossible rnd command"),
+      Cmdtype::Redo => {Action::Redo}
+      Cmdtype::Undo => {Action::Undo}
+
+    }
+  }
+
+  let mut current_user = 0;
+  for _ in 0..num {
+    match user_action(&mut rng, &dist) {
+      a @ Action::Redo |
+      a @ Action::Undo => {
+        acts = acts.append(a.clone());
+        acts = acts.append(a);      
+      }
+      a @ _ => {
+        acts = acts.append(Action::Cmd(Command::Switch(current_user.to_string())));
+        acts = acts.append(a);      
+      }
+    }
+    current_user = (current_user + 1) % users;
+  }
+  acts
+}
+
+fn rnd_char(rng: &mut StdRng) -> String {
+  let ascii: u8 = match rng.gen_range(0, 20) {
+    0 ... 4 => {32} //space
+    5 ... 6 => {rng.gen_range(48,48+10)} //numbers
+    7 ... 16 => {rng.gen_range(97,97+26)} //lower case
+    17 ... 18 => {rng.gen_range(65,65+26)} //upper case
+    _ => {13} //return
+  };
+  if ascii == 13 {"\n".to_string()} else {
+    String::from_utf8(vec![ascii]).unwrap()  
+  }
+}
+
+fn rnd_dir(rng: &mut StdRng) -> Dir {
+  if rng.gen_range(0,10) > 3 {Dir::R} else {Dir::L}
+}
+
+fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<Action> {
   let mut rng: StdRng = match seed {
     None => StdRng::new().unwrap(),
     Some(s) => {
@@ -94,23 +161,6 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<
     let rn: u32 = rng.gen_range(0, max_cursor);
     rn.to_string()
   };
-
-  fn rnd_char(rng: &mut StdRng) -> String {
-    let ascii: u8 = match rng.gen_range(0, 20) {
-      0 ... 4 => {32} //space
-      5 ... 6 => {rng.gen_range(48,48+10)} //numbers
-      7 ... 16 => {rng.gen_range(97,97+26)} //lower case
-      17 ... 18 => {rng.gen_range(65,65+26)} //upper case
-      _ => {13} //return
-    };
-    if ascii == 13 {"\n".to_string()} else {
-      String::from_utf8(vec![ascii]).unwrap()  
-    }
-  }
-
-  fn rnd_dir(rng: &mut StdRng) -> Dir {
-    if rng.gen_range(0,10) > 3 {Dir::R} else {Dir::L}
-  }
 
   let mut rnd_action = |rng: &mut StdRng, dist:&RandomPie| {
     let cmd = match nc {
@@ -260,6 +310,7 @@ fn main() {
         -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
+        -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -f --outfile=[outfile]        'filename for testing output'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
@@ -276,6 +327,7 @@ fn main() {
         -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
+        -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -f --outfile=[outfile]        'filename for testing output'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
@@ -302,6 +354,7 @@ fn main() {
   let cmds_seed = match value_t!(test_args.value_of("cmds_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
   let rnd_dist = values_t!(test_args.values_of("rnd_dist"), u32).unwrap_or(vec![50, 20, 10, 20, 1, 1, 1, 1, 1, 1]);
   let rnd_dist = RandomPie::new(rnd_dist);
+  let users = value_t!(test_args.value_of("users"), u32).ok();
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let show_curs = !test_args.is_present("hide_curs");
   let no_cursors = test_args.is_present("no_cursors");
@@ -339,7 +392,11 @@ fn main() {
   //loop data
   let mut main_edit: Box<EditorPipeline>;
   let mut needs_update = true;
-  let more_inputs = rnd_inputs(rnd_adds, cmds_seed, &rnd_dist, no_cursors).rev();
+  let more_inputs = if let Some(u) = users {
+    user_inputs(u, rnd_adds, cmds_seed, &rnd_dist).rev()
+  } else {
+    rnd_inputs(rnd_adds, cmds_seed, &rnd_dist, no_cursors).rev()
+  };
   let mut more_inputs_iter = more_inputs.iter();
   let mut content_text = List::new().append("".to_string());
 
