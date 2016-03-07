@@ -245,31 +245,31 @@ pub fn content_of_cmdz
     let emp = Symz::empty(st);
     Cmds::fold_lr(
       st, cmds, (emp, None, "0".to_string(), ContentInfo::zero()),
-      /* Leaf */ &|st, cmd, (z, optnm, active, _) | {
+      /* Leaf */ &|st, cmd, (z0, optnm, active, _) | {
+        // tz is a canonical symbol tree that consists of the symbols in zipper z
         let tz = {
           let z = match cmd.clone() {
-            Command::Switch(_) =>
-              // XXX: Do we need names/arts?
-              Symz::insert_optnm(st, z.clone(), Dir2::Left, optnm.clone(), Symbol::Cur(active.clone())),
-            _ => z.clone()
-          };
-          // Bug fix: Need to do this get_tree operation
-          // structurally, not nominally! In general, names *will* be
-          // re-associated in the tree throughout the dynamic extent
-          // of this Cmds::fold_lr call.
+            Command::Jmp(_) | Command::Join(_) => z0.clone(),
+            _ => Symz::insert_optnm(st, z0.clone(), Dir2::Left, None, Symbol::Cur(active.clone())),
+          } ;
           st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
         } ;
-
-        //log output
-        //let msg = last_action.map(|ac| format!("last action: {:?}", ac));
-        //let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
-        //tz.log_snapshot(st, None);
-
+        // info consists of ContentInfo for symbol tree tz
         let info = tree_info::<A,Syms> (st, tz.clone() ) ;
-
-        //Symz::print_all(st, z.clone());
-        //println!("name-cmd: {:?} {:?}", optnm, cmd);
-
+        // focus_cursor is the cursor target for focusing the symbol tree into a new zipper
+        let focus_cursor = match cmd.clone () {
+          Command::Switch(c) | Command::Join(c) | Command::Jmp(c) => c,
+          Command::Ins(_,_) | Command::Rem(_) | Command::Move(_) | Command::Ovr(_, _)
+            | Command::Mk(_) => active.clone(),
+        };
+        // z is new zipper, defined by focus_cursor on tree tz
+        // next_active is the active cursor after evaluating the command cmd
+        let z_emp = Symz::empty(st);
+        let (z, next_active, focus_success) =          
+          match tree_focus::<A,Syms,Symz>(st, tz, focus_cursor.clone(), z_emp) {
+          None    => (z0, active, false),
+          Some(z) => (z, if let Command::Jmp(_) = cmd.clone() { active } else { focus_cursor }, true),
+        } ;
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
           Command::Rem(dir) |
@@ -277,65 +277,29 @@ pub fn content_of_cmdz
           Command::Ovr(_, dir) => pass_cursors::<A,Syms,Symz>(st, z, dir2_of_dir(&dir)),
           _ => z
         } ;
-        let (z, optnm_next, active) : (_,Option<A::Name>,_) = match cmd {
-
+        let z = match cmd {
           Command::Ins(data, dir) => {
-            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir).opp(), optnm, Symbol::Data(data)) ;
-            (z, None, active)
+            Symz::insert_optnm(st, z, dir2_of_dir(&dir).opp(), optnm, Symbol::Data(data))
           },
-
           Command::Rem(dir) => {
-            let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
-            // XXX Return nm or None here?
-            (z, None, active)
+            (Symz::remove(st, z, dir2_of_dir(&dir))).0
           },
-
           Command::Move(dir) => {
-            let (z, _) = Symz::move_optnm(st, z, dir2_of_dir(&dir), optnm) ;
-            (z, None, active)
+            (Symz::move_optnm(st, z, dir2_of_dir(&dir), optnm)).0
           },
-
           Command::Ovr(data, dir) => {
-            let (z, _) = Symz::remove(st, z, dir2_of_dir(&dir)) ;
-            let z = Symz::insert_optnm(st, z, dir2_of_dir(&dir.opp()), optnm, Symbol::Data(data)) ;
-            (z, None, active)
-          },
-          
+            let z = (Symz::remove(st, z, dir2_of_dir(&dir))).0 ;
+            Symz::insert_optnm(st, z, dir2_of_dir(&dir.opp()), optnm, Symbol::Data(data))
+          },          
           Command::Mk(cursor) => {
-            let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor)) ;
-            (z, None, active)
+            Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor))
           },
-
-          Command::Join(cursor) => // XXX: Join code does not use optnm
-          { let z_new = Symz::empty(st);
-            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-            match z_new {
-              None => (z, None, active),
-              Some(z) => (z, None, cursor),
-            }},
-
-          Command::Switch( cursor) => {
-            if cursor == active { (z, None, active) } else {
-            let z_new = Symz::empty(st);
-            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-            match z_new {
-              None =>        (z, None, active),
-              Some(new_z) => (new_z, None, cursor),
-            }}},
-
-          Command::Jmp(cursor) => {
-            let z_new = Symz::empty(st);
-            let z_new = tree_focus::<A,Syms,Symz>(st, tz, cursor.clone(), z_new) ;
-            match z_new {
-              None => (z, None, active),
-              Some(z) => {
-                let z = Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor));
-                (z, None, active)
-              }
-            }},
-          //_ => panic!("not handled")
+          Command::Join(cursor)   => z,
+          Command::Switch(cursor) => z,
+          Command::Jmp(cursor)    => if ! focus_success { z } else {
+            Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor)) }
         } ;
-        (z, optnm_next, active, info)
+        (z, None, next_active, info)
       },
       /* Bin  */ &|st, _, r| { //panic!("Bin in command tree!");
       r },
