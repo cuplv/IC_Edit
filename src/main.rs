@@ -283,6 +283,7 @@ fn try_create_window(x: u32, y: u32) -> Result<GlutinWindow, String> {
     .build()
 }
 
+// comment this to run interactive mode, uncomment for testing with a large stack
 // fn main() {
 //   use std::thread;
 //   use std::thread::JoinHandle;
