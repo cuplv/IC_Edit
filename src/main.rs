@@ -79,7 +79,7 @@ fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
 }
 
-fn user_inputs(users: u32, num: u32, seed: Option<usize>, dist:&RandomPie) -> List<Action> {
+fn user_inputs(users: u32, pad: u32, num: u32, seed: Option<usize>, dist:&RandomPie) -> List<Action> {
   use rand::{Rng, StdRng, SeedableRng};
   let mut rng: StdRng = match seed {
     None => StdRng::new().unwrap(),
@@ -92,15 +92,22 @@ fn user_inputs(users: u32, num: u32, seed: Option<usize>, dist:&RandomPie) -> Li
   let mut acts = List::new();
 
   for u in 1..users {
-    acts = acts.append(Action::Cmd(Command::Mk(u.to_string())))
+    acts = acts.append(Action::Cmd(Command::Mk(u.to_string())));
+    for _ in 0..pad {
+      acts = acts.append(user_action(&mut rng, &dist, true))
+    }
   }
 
-  fn user_action(rng: &mut StdRng, dist:&RandomPie) -> Action {
+  fn user_action(rng: &mut StdRng, dist:&RandomPie, pad: bool) -> Action {
+    let dir = match pad {
+      true => Dir::R,
+      false => rnd_dir(rng)
+    };
     match dist.get_cmd_type(rng) {
-      Cmdtype::Ovr => {Action::Cmd(Command::Ovr(rnd_char(rng), rnd_dir(rng)))}
-      Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
-      Cmdtype::Rem => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
-      Cmdtype::Mov => {Action::Cmd(Command::Move(rnd_dir(rng)))}
+      Cmdtype::Ovr => {Action::Cmd(Command::Ovr(rnd_char(rng), dir))}
+      Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), dir))}
+      Cmdtype::Rem => {Action::Cmd(Command::Rem(dir))}
+      Cmdtype::Mov => {Action::Cmd(Command::Move(dir))}
       Cmdtype::Make |
       Cmdtype::Swch |
       Cmdtype::Jump |
@@ -113,7 +120,7 @@ fn user_inputs(users: u32, num: u32, seed: Option<usize>, dist:&RandomPie) -> Li
 
   let mut current_user = 0;
   for _ in 0..num {
-    match user_action(&mut rng, &dist) {
+    match user_action(&mut rng, &dist, false) {
       a @ Action::Redo |
       a @ Action::Undo => {
         acts = acts.append(a.clone());
@@ -320,6 +327,7 @@ fn main() {
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
+        -p --padding=[padding]        'initially separate the n cursors with [padding] commands each'
         -f --outfile=[outfile]        'filename for testing output'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
@@ -337,6 +345,7 @@ fn main() {
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
+        -p --padding=[padding]        'initially separate the n cursors with [padding] commands each'
         -f --outfile=[outfile]        'filename for testing output'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
@@ -364,6 +373,7 @@ fn main() {
   let rnd_dist = values_t!(test_args.values_of("rnd_dist"), u32).unwrap_or(vec![50, 20, 10, 20, 1, 1, 1, 1, 1, 1]);
   let rnd_dist = RandomPie::new(rnd_dist);
   let users = value_t!(test_args.value_of("users"), u32).ok();
+  let padding = value_t!(test_args.value_of("padding"), u32).unwrap_or(0);
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let show_curs = !test_args.is_present("hide_curs");
   let no_cursors = test_args.is_present("no_cursors");
@@ -402,7 +412,7 @@ fn main() {
   let mut main_edit: Box<EditorPipeline>;
   let mut needs_update = true;
   let more_inputs = if let Some(u) = users {
-    user_inputs(u, rnd_adds, cmds_seed, &rnd_dist).rev()
+    user_inputs(u, padding, rnd_adds, cmds_seed, &rnd_dist).rev()
   } else {
     rnd_inputs(rnd_adds, cmds_seed, &rnd_dist, no_cursors).rev()
   };
