@@ -93,16 +93,16 @@ fn user_inputs(users: u32, pad: u32, num: u32, seed: Option<usize>, dist:&Random
 
   for u in 1..users {
     acts = acts.append(Action::Cmd(Command::Mk(u.to_string())));
-    for _ in 0..pad {
-      acts = acts.append(user_action(&mut rng, &dist, true))
+    for _ in 0..(pad){
+      for _ in 0..20 {
+        acts = acts.append(Action::Cmd(Command::Ins(" ".to_string(),Dir::R)));
+      }
+      acts = acts.append(Action::Cmd(Command::Ins("\n".to_string(),Dir::R)));
     }
   }
 
-  fn user_action(rng: &mut StdRng, dist:&RandomPie, pad: bool) -> Action {
-    let dir = match pad {
-      true => Dir::R,
-      false => rnd_dir(rng)
-    };
+  fn user_action(rng: &mut StdRng, dist:&RandomPie) -> Action {
+    let dir = rnd_dir(rng);
     match dist.get_cmd_type(rng) {
       Cmdtype::Ovr => {Action::Cmd(Command::Ovr(rnd_char(rng), dir))}
       Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), dir))}
@@ -120,7 +120,7 @@ fn user_inputs(users: u32, pad: u32, num: u32, seed: Option<usize>, dist:&Random
 
   let mut current_user = 0;
   for _ in 0..num {
-    match user_action(&mut rng, &dist, false) {
+    match user_action(&mut rng, &dist) {
       a @ Action::Redo |
       a @ Action::Undo => {
         acts = acts.append(a.clone());
@@ -327,7 +327,7 @@ fn main() {
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
-        -p --padding=[padding]        'initially separate the n cursors with [padding] commands each'
+        -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
@@ -345,7 +345,7 @@ fn main() {
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
-        -p --padding=[padding]        'initially separate the n cursors with [padding] commands each'
+        -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
