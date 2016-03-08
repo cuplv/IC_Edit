@@ -120,8 +120,71 @@ pub fn passthrough(direction: Dir, before: List<Symbol>, after: List<Symbol>, mu
   }
 }
 
+pub fn goto_item(loc: isize, l: &List<Symbol>, r: &List<Symbol>, mut stat: SpecStats)
+-> ((List<Symbol>, List<Symbol>), SpecStats) {
+  let mut count = 0;
+
+  //count right
+  let mut second = r.clone();
+  loop {
+    match second.head().map(|h| h.clone()) {
+      None => {break}
+      Some(Symbol::Data(d)) => {
+        if d == "\n" {} else {count += 1};
+        second = second.tail();
+      }
+      Some(Symbol::Cur(c)) => {
+        second = second.tail();
+      }
+    }
+  }
+
+  //count left and shift
+  let mut first = l.clone();
+  let mut second = r.clone();
+  loop {
+    match first.head().map(|h| h.clone()) {
+      None => {break}
+      Some(Symbol::Data(d)) => {
+        if d == "\n" {} else {count += 1};
+        first = first.tail();
+        second = second.append(Symbol::Data(d));
+      }
+      Some(Symbol::Cur(c)) => {
+        first = first.tail();
+        second = second.append(Symbol::Cur(c));
+      }
+    }
+  }
+
+  // calculate location
+  count += 1;
+  let loc = ((loc % count) + count) % count; // mod operator so that -1 = last item
+
+  // seek to location
+  let mut count = 0;
+  let mut first = List::new();
+  if loc == 0 {return ((first, second), stat)};
+  loop {
+    match second.head().map(|h| h.clone()) {
+      None => { unreachable!() } // we counted the length
+      Some(Symbol::Data(d)) => {
+        if d == "\n" {} else {count += 1};
+        second = second.tail();
+        first = first.append(Symbol::Data(d));
+        if count == loc {break};
+      }
+      Some(Symbol::Cur(c)) => {
+        second = second.tail();
+        first = first.append(Symbol::Cur(c));
+      }
+    }
+  }
+  ((first, second), stat)
+}
+
 pub fn join_cursor(cur: Cursor, l: &List<Symbol>, r: &List<Symbol>, mut stat: SpecStats)
-  -> (Option<(List<Symbol>, List<Symbol>)>, SpecStats) {
+-> (Option<(List<Symbol>, List<Symbol>)>, SpecStats) {
   let mut first = l.clone();
   let mut second = r.clone();
 
@@ -205,6 +268,10 @@ pub fn content_of_commands(commands: &List<Command>, mut stat: SpecStats) -> (CZ
           None => {((b, ccursor, List::new()),s)}
           Some(d) => {((b.append(d.clone()), ccursor, a.tail()),s)}
         }
+      }
+      Command::Goto(pos) => {
+        let ((b, a), s) = goto_item(pos, &before, &after, stat);
+        ((b, ccursor, a),s)
       }
       Command::Ovr(ref d, Dir::L) => {
         let ((b, a),s) = passthrough(Dir::L, before, after, stat);

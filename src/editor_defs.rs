@@ -42,6 +42,7 @@ pub enum Command {
   Rem(Dir),           //Remove character located <Dir>
   Move(Dir),          //Move cursor <Dir>
   Ovr(String, Dir),   //Overwrite with <String>, moving cursor <Dir>
+  Goto(isize),        //Go to location after the <isize>th data item (mod total items)
   Mk(Cursor),
   Switch(Cursor),
   Jmp(Cursor),
@@ -51,13 +52,13 @@ pub enum Command {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cmdtype {
   Ins, Ovr, Rem, Mov,
-  Make, Swch, Jump, Join,
+  Goto, Make, Swch, Jump, Join,
   Undo, Redo
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CCs {
-  Mk, Switch, Jmp, Join
+  Goto, Mk, Switch, Jmp, Join
 }
 
 impl Action {
@@ -77,6 +78,7 @@ impl Command {
       Command::Rem(_) => "Remove",
       Command::Move(_) => "Move",
       Command::Ovr(_,_) => "Overwrite",
+      Command::Goto(_) => "Goto",
       Command::Mk(_) => "MakeCursor",
       Command::Switch(_) => "Switch",
       Command::Jmp(_) => "JumpTo",

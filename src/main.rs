@@ -108,6 +108,7 @@ fn user_inputs(users: u32, pad: u32, num: u32, seed: Option<usize>, dist:&Random
       Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), dir))}
       Cmdtype::Rem => {Action::Cmd(Command::Rem(dir))}
       Cmdtype::Mov => {Action::Cmd(Command::Move(dir))}
+      Cmdtype::Goto => {Action::Cmd(Command::Goto(rng.gen()))}
       Cmdtype::Make |
       Cmdtype::Swch |
       Cmdtype::Jump |
@@ -179,6 +180,7 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<
       Cmdtype::Ins => {Action::Cmd(Command::Ins(rnd_char(rng), rnd_dir(rng)))}
       Cmdtype::Rem => {Action::Cmd(Command::Rem(rnd_dir(rng)))}
       Cmdtype::Mov => {Action::Cmd(Command::Move(rnd_dir(rng)))}
+      Cmdtype::Goto => {Action::Cmd(Command::Goto(rng.gen()))}
       Cmdtype::Make => {
         cursor_count = cursor_count + 1;
         Action::Cmd(Command::Mk((cursor_count - 1).to_string()))
@@ -264,6 +266,7 @@ fn render_cursor(c: graphics::context::Context, g: &mut GlGraphics, f: &mut Glyp
   text.color = [1.0, 1.0, 1.0, 1.0];
   let (px,py) = (200.0,250.0);
   let prompt = match cc {
+    CCs::Goto => {"Goto item number: "}
     CCs::Mk => {"Create cursor: "}
     CCs::Switch => {"Switch to cursor: "}
     CCs::Jmp => {"Jump to cursor: "}
@@ -311,7 +314,7 @@ fn main() {
       -y --height=[height]            'initial editor height in pixels'
       -s --rnd_start=[rnd_start]      'number of random starting commands'
       -c --rnd_cmds=[rnd_cmds]        'number of random commands after start'
-      -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+      -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
       --start_seed=[start_seed]       'seed integer for random initial commands'
       --cmds_seed=[cmds_seed]         'seed integer for random additional commands'
       -h --hide_curs                  'hide cursors initially'
@@ -323,7 +326,7 @@ fn main() {
         -y --height=[height]          'editor height in pixels'
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
-        -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+        -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
@@ -341,7 +344,7 @@ fn main() {
       .args_from_usage("\
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
-        -d --rnd_dist [ins] [ovr] [rem] [mov] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+        -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
@@ -370,7 +373,7 @@ fn main() {
   let rnd_adds = value_t!(test_args.value_of("rnd_cmds"), u32).unwrap_or(if test {DEFAULT_RND_CMDS} else {0});
   let start_seed = match value_t!(test_args.value_of("start_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
   let cmds_seed = match value_t!(test_args.value_of("cmds_seed"), usize).unwrap_or(0) { 0 => None, v => Some(v)};
-  let rnd_dist = values_t!(test_args.values_of("rnd_dist"), u32).unwrap_or(vec![50, 20, 10, 20, 1, 1, 1, 1, 1, 1]);
+  let rnd_dist = values_t!(test_args.values_of("rnd_dist"), u32).unwrap_or(vec![50, 20, 10, 20, 1, 1, 1, 1, 1, 1, 1]);
   let rnd_dist = RandomPie::new(rnd_dist);
   let users = value_t!(test_args.value_of("users"), u32).ok();
   let padding = value_t!(test_args.value_of("padding"), u32).unwrap_or(0);
@@ -465,7 +468,7 @@ fn main() {
       //display stats
       {
         let (stat, _) = main_edit.stats();
-        println!("Milliseconds: {}", stat.time()); 
+        println!("Milliseconds: {}", (stat.time() as f64)/1000000.0);
       }
       //add action
       match more_inputs_iter.next() {
@@ -709,13 +712,20 @@ fn main() {
                   }
                   Inputstatus::EnterCursor(p,c,mut e @ _) => {
                     let content = firstline(&e.get_lines(&ViewParams{addcursor: false, showcursors: false}, None));
-                    let newcommand = match c {
-                        CCs::Mk => {Command::Mk(content)}
-                        CCs::Switch => {Command::Switch(content)}
-                        CCs::Jmp => {Command::Jmp(content)}
-                        CCs::Join => {Command::Join(content)}
-                    };
-                    main_edit.take_action(Action::Cmd(newcommand), None);
+                    if let CCs::Goto = c {
+                      if let Ok(pos) = content.parse() {
+                        main_edit.take_action(Action::Cmd(Command::Goto(pos)), None);
+                      }
+                    } else {
+                      let newcommand = match c {
+                          CCs::Goto => { unreachable!() } // selected by if let above
+                          CCs::Mk => {Command::Mk(content)}
+                          CCs::Switch => {Command::Switch(content)}
+                          CCs::Jmp => {Command::Jmp(content)}
+                          CCs::Join => {Command::Join(content)}
+                      };
+                      main_edit.take_action(Action::Cmd(newcommand), None);
+                    }
                     *p
                   }
                 };
@@ -752,6 +762,20 @@ fn main() {
                 };
                 status = newstatus;
                 needs_update = true;
+              } else {continue}
+            }
+            /*Goto*/ Key::G => {
+              if command_key_down{
+                  let newstatus = match status {
+                    Inputstatus::Insert(_, _) | Inputstatus::Overwrite(_, _) => {
+                      Inputstatus::EnterCursor(Box::new(status), CCs::Goto, SpecEditor::new(List::new()))
+                    }
+                    Inputstatus::EnterCursor(_,_,_) => {
+                      status
+                    }
+                  };
+                  status = newstatus;
+                  needs_update = true;
               } else {continue}
             }
             /*Mk*/ Key::M => {

@@ -182,6 +182,47 @@ pub fn tree_focus<A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>>
        )
   }
 
+pub fn tree_focus_position<
+  A:Adapton,T:TreeT<A,Symbol>,Symz:ListEdit<A,Symbol,T>
+>(
+  st:&mut A, tree:T::Tree, pos:isize, symz:Symz::State
+) -> Symz::State {
+  let ti = tree_info::<A,T>(st, tree.clone()) ;
+  let m = (ti.data_count+1) as isize;
+  let pos = ((pos % m) + m) % m; // mod operator so that -1 = last item
+  T::elim_move(
+    st, tree, (pos, symz),
+    /* Empty */ |st, (pos, symz)| symz,
+    /* Leaf */  |st, sym, (pos, symz)| {
+      if pos == 0 { Symz::insert(st, symz, Dir2::Right, sym) }
+      else { Symz::insert(st, symz, Dir2::Left, sym) }
+    },
+    /* Bin */ |st, _, l, r, (pos, symz)| {
+      let li = tree_info::<A,T>(st, l.clone()) ;
+      if li.data_count >= pos as usize {
+        let symz = Symz::ins_tree(st, symz, Dir2::Right, r, Dir2::Left);
+        return tree_focus_position::<A,T,Symz>(st, l, pos, symz)
+      } else {
+        let symz = Symz::ins_tree(st, symz, Dir2::Left, l, Dir2::Right);
+        return tree_focus_position::<A,T,Symz>(st, r, pos - li.data_count as isize, symz)
+      }
+    },
+    /* Name */ |st, nm, _, l, r, (pos, symz)| {
+      let li = tree_info::<A,T>(st, l.clone()) ;
+      if li.data_count >= pos as usize {
+        let symz = st.structural(|st| {
+          Symz::ins_tree_optnm(st, symz, Dir2::Right, Some(nm), r, Dir2::Left)
+        });
+        return tree_focus_position::<A,T,Symz>(st, l, pos, symz)
+      } else {
+        let symz = st.structural(|st| {
+          Symz::ins_tree_optnm(st, symz, Dir2::Left, Some(nm), l, Dir2::Right)
+        });
+        return tree_focus_position::<A,T,Symz>(st, r, pos - li.data_count as isize, symz)
+      }
+    }
+  )
+}
 
 pub fn tree_info<A:Adapton,T:TreeT<A,Symbol>>
   (st:&mut A, tree:T::Tree) -> ContentInfo
@@ -249,7 +290,7 @@ pub fn content_of_cmdz
         // tz is a canonical symbol tree that consists of the symbols in zipper z
         let tz = {
           let z = match cmd.clone() {
-            Command::Jmp(_) | Command::Join(_) => z0.clone(),
+            Command::Goto(_) | Command::Jmp(_) | Command::Join(_) => z0.clone(),
             _ => Symz::insert_optnm(st, z0.clone(), Dir2::Left, None, Symbol::Cur(active.clone())),
           } ;
           st.structural(|st| { Symz::get_tree(st, z, Dir2::Left) })
@@ -260,15 +301,19 @@ pub fn content_of_cmdz
         let focus_cursor = match cmd.clone () {
           Command::Switch(c) | Command::Join(c) | Command::Jmp(c) => c,
           Command::Ins(_,_) | Command::Rem(_) | Command::Move(_) | Command::Ovr(_, _)
-            | Command::Mk(_) => active.clone(),
+            | Command::Mk(_) | Command::Goto(_) => active.clone(),
         };
         // z is new zipper, defined by focus_cursor on tree tz
         // next_active is the active cursor after evaluating the command cmd
         let z_emp = Symz::empty(st);
-        let (z, next_active, focus_success) =          
-          match tree_focus::<A,Syms,Symz>(st, tz, focus_cursor.clone(), z_emp) {
-          None    => (z0, active, false),
-          Some(z) => (z, if let Command::Jmp(_) = cmd.clone() { active } else { focus_cursor }, true),
+        let (z, next_active, focus_success) =
+          if let Command::Goto(p) = cmd.clone() {
+            (tree_focus_position::<A,Syms,Symz>(st, tz, p, z_emp), active, true)
+          } else {
+            match tree_focus::<A,Syms,Symz>(st, tz, focus_cursor.clone(), z_emp) {
+            None    => (z0, active, false),
+            Some(z) => (z, if let Command::Jmp(_) = cmd.clone() { active } else { focus_cursor }, true),
+          }
         } ;
         let z = match cmd.clone() {
           Command::Ins(_, dir) |
@@ -291,6 +336,7 @@ pub fn content_of_cmdz
             let z = (Symz::remove(st, z, dir2_of_dir(&dir))).0 ;
             Symz::insert_optnm(st, z, dir2_of_dir(&dir.opp()), optnm, Symbol::Data(data))
           },          
+          Command::Goto(pos) => z,
           Command::Mk(cursor) => {
             Symz::insert_optnm(st, z, Dir2::Left, optnm, Symbol::Cur(cursor))
           },
