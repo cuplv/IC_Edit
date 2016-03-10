@@ -294,15 +294,15 @@ fn try_create_window(x: u32, y: u32) -> Result<GlutinWindow, String> {
 }
 
 // comment this to run interactive mode, uncomment for testing with a large stack
-// fn main() {
-//   use std::thread;
-//   use std::thread::JoinHandle;
-//   let child =
-//     thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { main2() });
-//   child.unwrap().join();
-// }
-
 fn main() {
+  use std::thread;
+  use std::thread::JoinHandle;
+  let child =
+    thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { main2() });
+  child.unwrap().join();
+}
+
+fn main2() {
 
   //command-line
   let args = clap::App::new("IC_Edit")
@@ -377,6 +377,7 @@ fn main() {
   let rnd_dist = RandomPie::new(rnd_dist);
   let users = value_t!(test_args.value_of("users"), u32).ok();
   let padding = value_t!(test_args.value_of("padding"), u32).unwrap_or(0);
+  let rnd_adds = match users { None => rnd_adds, Some(_) => rnd_adds/2 };
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let show_curs = !test_args.is_present("hide_curs");
   let no_cursors = test_args.is_present("no_cursors");
