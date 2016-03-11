@@ -577,7 +577,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     s3_create,s3_eval,s3_dirty,s3_clean,s3_stack,\
     s4_create,s4_eval,s4_dirty,s4_clean,s4_stack,\
     cursor_cnt, data_cnt, line_cnt, tree_height,\
-    name_cnt, bin_cnt\
+    name_cnt, bin_cnt, os_MB_used\
     ".to_string()
   }
 
@@ -586,15 +586,26 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
       None => "None".to_string(),
       Some( ref a) => format!("{}",a),
     };
+
+    // python-based memory capture
+    use std::process::Command;
+    let output =
+      Command::new("python")
+      .arg("scripts/mem_use.py")
+      .output()
+      .unwrap_or_else(|e| { panic!("failed to execute python memory script: {}", e) });
+    let outstr = String::from_utf8_lossy(&output.stdout);
+    let mem = outstr.trim();
+
     let (s1,s2,s3,s4,info) = (&self.last_stats.stage1,&self.last_stats.stage2,&self.last_stats.stage3,&self.last_stats.stage4,&self.last_stats.info);
-    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    (&self.last_stats, format!("Fast,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
       self.total_actions, last_action, self.last_stats.gen_time,
       s1.create, s1.eval, s1.dirty, s1.clean, s1.stack,
       s2.create, s2.eval, s2.dirty, s2.clean, s2.stack,
       s3.create, s3.eval, s3.dirty, s3.clean, s3.stack,
       s4.create, s4.eval, s4.dirty, s4.clean, s4.stack,
       info.cursors.len(), info.data_count, info.line_count, info.height,
-      info.name_count, info.bin_count
+      info.name_count, info.bin_count, mem
     ))
   }
 

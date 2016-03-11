@@ -454,21 +454,17 @@ fn main2() {
   if windowless {
     loop {
 
-      //update content
-
-      let (_, csv) = main_edit.stats();
-      match outfile {
-        None => (),
-        Some(ref mut f) => {
-          if let Err(_) = writeln!(f, "{},{},{}", time::now().asctime(), test_tag, csv) {
-            panic!("can't write to file");
-          }
-        }
-      }
-
-      //display stats
+      //update content and display stats
       {
-        let (stat, _) = main_edit.stats();
+        let (stat, csv) = main_edit.stats();
+        match outfile {
+          None => (),
+          Some(ref mut f) => {
+            if let Err(_) = writeln!(f, "{},{},{}", time::now().asctime(), test_tag, csv) {
+              panic!("can't write to file");
+            }
+          }
+        };
         println!("Milliseconds: {}", (stat.time() as f64)/1000000.0);
       }
       //add action

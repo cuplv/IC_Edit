@@ -39,4 +39,4 @@ for row in range(1,len(vmLines)-2):
 #print 'Active Memory:\t\t%d MB' % ( vmStats["Pages active"]/1024/1024 )
 #print 'Inactive Memory:\t%d MB' % ( vmStats["Pages inactive"]/1024/1024 )
 #print 'Free Memory:\t\t%d MB' % ( vmStats["Pages free"]/1024/1024 )
-print '%s:\t%.3f MB' % ( procname, rssTotal/1024/1024 )
+print '%.3f' % ( rssTotal/1024/1024 )
