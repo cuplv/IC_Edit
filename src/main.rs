@@ -21,6 +21,7 @@ const TEST_HEIGHT: u32 = 800;
 const DEFAULT_RND_START: u32 = 0;
 const DEFAULT_RND_CMDS: u32 = 100000;
 const DEFAULT_OUTFILE: Option<&'static str> = Some("testout.csv");
+const DEFAULT_SAMPLING: u32 = 11; //primes work best
 
 extern crate time;
 extern crate rand;
@@ -77,6 +78,18 @@ enum Inputstatus {
 
 fn firstline(l: &List<String>) -> String {
   l.head().unwrap_or(&"".to_string()).clone()
+}
+
+fn mem_usage() -> String {
+  // python-based memory capture
+  use std::process::Command;
+  let output =
+    Command::new("python")
+    .arg("scripts/mem_use.py")
+    .output()
+    .unwrap_or_else(|e| { panic!("failed to execute python memory script: {}", e) });
+  let outstr = String::from_utf8_lossy(&output.stdout);
+  String::from(outstr.trim())
 }
 
 fn user_inputs(users: u32, pad: u32, num: u32, seed: Option<usize>, dist:&RandomPie) -> List<Action> {
@@ -332,6 +345,7 @@ fn main2() {
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
+        --samp=[samp]                 'downsample ratio'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
@@ -350,6 +364,7 @@ fn main2() {
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
+        --samp=[samp]                 'downsample ratio'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
@@ -399,6 +414,8 @@ fn main2() {
     .open(f)
     .unwrap()
   });
+  let downsample = value_t!(test_args.value_of("samp"), u32).unwrap_or(DEFAULT_SAMPLING);
+  let mut action_count = 0;
 
   // this is being replaced by adapton logging
   let mut logfile = &mut
@@ -445,7 +462,7 @@ fn main2() {
   match outfile {
     None => (),
     Some(ref mut f) => {
-      if let Err(_) = writeln!(f, "##timestamp,user_tag,{}", main_edit.csv_title_line()) {
+      if let Err(_) = writeln!(f, "##timestamp,user_tag,{},os_MB_used", main_edit.csv_title_line()) {
         panic!("can't write to file");
       }
     }
@@ -455,21 +472,24 @@ fn main2() {
     loop {
 
       //update content and display stats
+      if action_count % downsample == 0
       {
         let (stat, csv) = main_edit.stats();
         match outfile {
           None => (),
           Some(ref mut f) => {
-            if let Err(_) = writeln!(f, "{},{},{}", time::now().asctime(), test_tag, csv) {
+            if let Err(_) = writeln!(f, "{},{},{},{}", time::now().asctime(), test_tag, csv, mem_usage()) {
               panic!("can't write to file");
             }
           }
         };
         println!("Milliseconds: {}", (stat.time() as f64)/1000000.0);
       }
+
       //add action
       match more_inputs_iter.next() {
         Some(cmd) => {
+          action_count += 1;
           main_edit.take_action(cmd.clone(), None);
           main_edit.get_lines(&ViewParams{
             addcursor: true,
@@ -871,16 +891,19 @@ fn main2() {
           match status {
             Inputstatus::Insert(_, s) | Inputstatus::Overwrite(_, s) => {
               if needs_update {
+                action_count += 1;
                 content_text = main_edit.get_lines(&ViewParams{
                   addcursor: true,
                   showcursors: s
                 }, Some(logfile));
                 let (_, csv) = main_edit.stats();
-                match outfile {
-                  None => (),
-                  Some(ref mut f) => {
-                    if let Err(_) = writeln!(f, "{},{},{}", time::now().asctime(), test_tag, csv) {
-                      panic!("can't write to file");
+                if action_count % downsample == 0 {
+                  match outfile {
+                    None => (),
+                    Some(ref mut f) => {
+                      if let Err(_) = writeln!(f, "{},{},{},{}", time::now().asctime(), test_tag, csv, mem_usage()) {
+                        panic!("can't write to file");
+                      }
                     }
                   }
                 }
