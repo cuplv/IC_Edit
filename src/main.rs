@@ -345,7 +345,7 @@ fn main2() {
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
-        --samp=[samp]                 'downsample ratio'
+        --samp=[samp]                 'downsample mempry collection'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
@@ -364,7 +364,7 @@ fn main2() {
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
-        --samp=[samp]                 'downsample ratio'
+        --samp=[samp]                 'downsample mempry collection'
         -t --test_tag=[test_tag]      'user-defined id info for the results csv'
         -h --hide_curs                'hide cursors initially'
         -n --no_cursors               'do not use cursors in random commands'
@@ -416,6 +416,7 @@ fn main2() {
   });
   let downsample = value_t!(test_args.value_of("samp"), u32).unwrap_or(DEFAULT_SAMPLING);
   let mut action_count = 0;
+  let mut last_mem = "0".to_string();
 
   // this is being replaced by adapton logging
   let mut logfile = &mut
@@ -472,13 +473,13 @@ fn main2() {
     loop {
 
       //update content and display stats
-      if action_count % downsample == 0
       {
+        if action_count % downsample == 0 {last_mem = format!("{}",mem_usage())};
         let (stat, csv) = main_edit.stats();
         match outfile {
           None => (),
           Some(ref mut f) => {
-            if let Err(_) = writeln!(f, "{},{},{},{}", time::now().asctime(), test_tag, csv, mem_usage()) {
+            if let Err(_) = writeln!(f, "{},{},{},{}", time::now().asctime(), test_tag, csv, last_mem) {
               panic!("can't write to file");
             }
           }
@@ -897,16 +898,15 @@ fn main2() {
                   showcursors: s
                 }, Some(logfile));
                 let (_, csv) = main_edit.stats();
-                if action_count % downsample == 0 {
-                  match outfile {
-                    None => (),
-                    Some(ref mut f) => {
-                      if let Err(_) = writeln!(f, "{},{},{},{}", time::now().asctime(), test_tag, csv, mem_usage()) {
-                        panic!("can't write to file");
-                      }
+                if action_count % downsample == 0 {last_mem = format!("{}",mem_usage())};
+                match outfile {
+                  None => (),
+                  Some(ref mut f) => {
+                    if let Err(_) = writeln!(f, "{},{},{},{}", time::now().asctime(), test_tag, csv, last_mem) {
+                      panic!("can't write to file");
                     }
                   }
-                }
+                };
                 needs_update = false
               }
               let (stat, _) = main_edit.stats();            
@@ -924,5 +924,6 @@ fn main2() {
       }
     }
 
-    }
+  }
+  std::process::exit(0);
 }
