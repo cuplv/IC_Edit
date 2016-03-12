@@ -56,10 +56,11 @@ pub struct AdaptEditor<A:Adapton,L:ListT<A,Action>> {
   last_action: Option<Action>,
   total_actions: usize,
   rev_actions: L::List,
+  sparse: usize,
 }
 
 impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
-  pub fn new(mut st: A, initial_actions: functional::List<Action>) -> AdaptEditor<A,L> {
+  pub fn new(mut st: A, initial_actions: functional::List<Action>, sparse: usize) -> AdaptEditor<A,L> {
 
     let count = initial_actions.iter().count();
     let mut more_acs = initial_actions ;
@@ -89,6 +90,7 @@ impl<A:Adapton,L:ListT<A,Action>> AdaptEditor<A,L> {
       last_action: None,
       total_actions: count,
       rev_actions: actions,
+      sparse: sparse,
     }
   }
 }
@@ -476,8 +478,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let id = self.next_id ;
     self.next_id += 1 ;
     self.total_actions += 1 ;
-    let sparse_count = 5;
-    if true { //self.next_id % sparse_count == 0 {
+    if self.next_id % self.sparse == 0 {
       let nm = self.adapton_st.name_of_usize(id) ;
       let (nm1,nm2) = self.adapton_st.name_fork(nm) ;
       self.rev_actions = {
@@ -506,7 +507,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
     let (time, cnt) =
       self.adapton_st.cnt(|st| { 
         let time = measure_ns(|| {
-          println!("----- {}", iter_count);
+          //println!("----- {}", iter_count);
           
           let (actiont, actiont_cnt) = st.cnt(|st| {
             let nm = st.name_of_string("tree_of_list".to_string()) ;
@@ -515,7 +516,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
             })}) ;
 
           
-          println!("actiont: {:?} {:?}", actiont_cnt, actiont);
+          //println!("actiont: {:?} {:?}", actiont_cnt, actiont);
 
           let (cmdz, cmdz_cnt) = st.cnt(|st| {
             let (cmdz, _) = cmdz_of_actions::<A
@@ -525,7 +526,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
             cmdz
           }) ;
           
-          println!("cmdz:    {:?} {:?}", cmdz_cnt, cmdz);
+          //println!("cmdz:    {:?} {:?}", cmdz_cnt, cmdz);
 
           let cmdz = ListZipper::clear_side(st, cmdz, Dir2::Right) ;          
           let (cmdt, cmdt_cnt) = st.cnt(|st|{
@@ -534,7 +535,7 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
               ListZipper::get_tree(st, cmdz, Dir2::Left)
             })}) ;
           
-          println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
+          //println!("cmdt:    {:?} {:?}", cmdt_cnt, cmdt);
 
           let ((content, info), content_cnt) = st.cnt(|st|{
             let nm = st.name_of_string("content_of_cmdz".to_string()) ;
@@ -549,9 +550,9 @@ impl<A:Adapton,L:ListT<A,Action>> EditorPipeline for AdaptEditor<A,L> {
           // let msg = last_action.map(|ac| format!("last action: {:?}", ac));
           // let msg = msg.as_ref().map(String::as_ref); // convert Option<String> to Option<&str>
           // if let Some(log) = log.take() {content.log_snapshot(st, "cursor",msg)};
-          println!("content: {:?} {:?}", content_cnt, content);
+          //println!("content: {:?} {:?}", content_cnt, content);
           //if format!("{:?}", content).len() > 400 { panic!("bad content articulations")} ;
-          println!("info:    {:?}", info);
+          //println!("info:    {:?}", info);
 
           result = make_lines(st, vp, content) ;
           stats = (actiont_cnt, cmdz_cnt, cmdt_cnt, content_cnt, info);          

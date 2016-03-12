@@ -19,7 +19,7 @@ const DEFAULT_HEIGHT: u32 = 800;
 const TEST_WIDTH: u32 = 800;
 const TEST_HEIGHT: u32 = 800;
 const DEFAULT_RND_START: u32 = 0;
-const DEFAULT_RND_CMDS: u32 = 100000;
+const DEFAULT_RND_CMDS: u32 = 1000;
 const DEFAULT_OUTFILE: Option<&'static str> = Some("testout.csv");
 const DEFAULT_SAMPLING: u32 = 11; //primes work best
 
@@ -342,6 +342,7 @@ fn main2() {
         -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
+        --sparse=[sparse]             'distance between arts'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
@@ -361,6 +362,7 @@ fn main2() {
         -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
+        --sparse=[sparse]             'distance between arts'
         -u --users=[users]            'alternare rnd generation cycling between n cursors'
         -p --padding=[padding]        'initially separate the n cursors with [padding] lines each'
         -f --outfile=[outfile]        'filename for testing output'
@@ -392,6 +394,7 @@ fn main2() {
   let rnd_dist = RandomPie::new(rnd_dist);
   let users = value_t!(test_args.value_of("users"), u32).ok();
   let padding = value_t!(test_args.value_of("padding"), u32).unwrap_or(0);
+  let sparse = value_t!(test_args.value_of("sparse"), usize).unwrap_or(3);
   let rnd_adds = match users { None => rnd_adds, Some(_) => rnd_adds/2 };
   let keep_open = if test {test_args.is_present("keep_open")} else {true};
   let show_curs = !test_args.is_present("hide_curs");
@@ -445,15 +448,15 @@ fn main2() {
   if test && use_adapton && use_spec {
     //println!("Preparing to perform dynamic verification ...");
     println!("Using VerifEditor::<Engine,_> ...");
-    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)))
+    main_edit = Box::new(VerifEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors), sparse))
   } else if use_adapton {
     println!("Using AdaptEditor::<Engine,_> ...");
-    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)))
+    main_edit = Box::new(AdaptEditor::<Engine,adapton::collection::List<Engine,Action>>::new(Engine::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors), sparse))
   } else if false {
     // Seems to overrun the stack;
     // tried using `export RUST_MIN_STACK=20485760` on the command line to mitigate this, but it didn't help.
     println!("Using AdaptEditor::<Naive,_> ...");
-    main_edit = Box::new(AdaptEditor::<AdaptonFromScratch,adapton::collection::List<AdaptonFromScratch,Action>>::new(AdaptonFromScratch::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)))
+    main_edit = Box::new(AdaptEditor::<AdaptonFromScratch,adapton::collection::List<AdaptonFromScratch,Action>>::new(AdaptonFromScratch::new(), rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors), sparse))
   } else {
     println!("Using SpecEditor ...");
     main_edit = Box::new(SpecEditor::new(rnd_inputs(rnd_start, start_seed, &rnd_dist, no_cursors)));

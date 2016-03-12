@@ -14,10 +14,10 @@ pub struct VerifEditor<A:Adapton,L:ListT<A,Action>> {
 }
 
 impl<A:Adapton,L:ListT<A,Action>> VerifEditor<A,L> {
-  pub fn new (mut st: A, acts:List<Action>) -> VerifEditor<A,L> {
+  pub fn new (mut st: A, acts:List<Action>, sparse: usize) -> VerifEditor<A,L> {
     VerifEditor{
       spec: SpecEditor::new(acts.clone()),
-      fast: AdaptEditor::new(st, acts),
+      fast: AdaptEditor::new(st, acts, sparse),
     }
   }
 }
