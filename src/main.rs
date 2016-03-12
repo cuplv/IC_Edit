@@ -125,20 +125,28 @@ fn user_inputs(users: u32, pad: u32, num: u32, seed: Option<usize>, dist:&Random
       Cmdtype::Make |
       Cmdtype::Swch |
       Cmdtype::Jump |
-      Cmdtype::Join => panic!("impossible rnd command"),
-      Cmdtype::Redo => {Action::Redo}
+      Cmdtype::Join => panic!("impossible rnd command join"),
+      Cmdtype::Redo => panic!("impossible rnd command redo"),
       Cmdtype::Undo => {Action::Undo}
 
     }
   }
 
   let mut current_user = 0;
+  let undos = dist.undo_count();
   for _ in 0..num {
     match user_action(&mut rng, &dist) {
-      a @ Action::Redo |
-      a @ Action::Undo => {
-        acts = acts.append(a.clone());
-        acts = acts.append(a);      
+      Action::Redo => panic!("impossible rnd command redo"),
+      Action::Undo => {
+        for _ in 0..undos {
+          acts = acts.append(Action::Undo);
+        }
+        if rng.gen() {
+          let redos = undos / 2;
+          for _ in 0..redos {
+            acts = acts.append(Action::Redo);
+          }
+        }
       }
       a @ _ => {
         acts = acts.append(Action::Cmd(Command::Switch(current_user.to_string())));
@@ -208,7 +216,21 @@ fn rnd_inputs(num: u32, seed: Option<usize>, dist:&RandomPie, nc: bool) -> List<
   };
 
   for _ in 0..num {
-    acts = acts.append(rnd_action(&mut rng, dist));
+    match rnd_action(&mut rng, dist) {
+      Action::Undo => {
+        let undos = dist.undo_count();
+        for _ in 0..undos {
+          acts = acts.append(Action::Undo);
+        }
+        if rng.gen() {
+          let redos = undos / 2;
+          for _ in 0..redos {
+            acts = acts.append(Action::Redo);
+          }
+        }
+      }
+      a @ _ => acts = acts.append(a)
+    }
   }
   acts
 }
@@ -327,7 +349,7 @@ fn main2() {
       -y --height=[height]            'initial editor height in pixels'
       -s --rnd_start=[rnd_start]      'number of random starting commands'
       -c --rnd_cmds=[rnd_cmds]        'number of random commands after start'
-      -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+      -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [undo] [undocount] 'distribution integers for random commands'
       --start_seed=[start_seed]       'seed integer for random initial commands'
       --cmds_seed=[cmds_seed]         'seed integer for random additional commands'
       -h --hide_curs                  'hide cursors initially'
@@ -339,7 +361,7 @@ fn main2() {
         -y --height=[height]          'editor height in pixels'
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
-        -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+        -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [undo] [undocount] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         --sparse=[sparse]             'distance between arts'
@@ -359,7 +381,7 @@ fn main2() {
       .args_from_usage("\
         -s --rnd_start=[rnd_start]    'number of random starting commands'
         -c --rnd_cmds=[rnd_cmds]      'number of random commands after start'
-        -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [redo] [undo] 'distribution integers for random commands'
+        -d --rnd_dist [ins] [ovr] [rem] [mov] [goto] [make] [swch] [jump] [join] [undo] [undocount] 'distribution integers for random commands'
         --start_seed=[start_seed]     'seed integer for random initial commands'
         --cmds_seed=[cmds_seed]       'seed integer for random additional commands'
         --sparse=[sparse]             'distance between arts'

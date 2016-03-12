@@ -11,8 +11,8 @@ pub struct RandomPie {
     swch: u32,
     jump: u32,
     join: u32,
-    redo: u32,
     undo: u32,
+    undo_c: u32,
 }
 
 impl RandomPie {
@@ -26,8 +26,8 @@ impl RandomPie {
     let swch = from_vals[6];
     let jump = from_vals[7];
     let join = from_vals[8];
-    let redo = from_vals[9];
-    let undo = from_vals[10];
+    let undo = from_vals[9];
+    let undo_c = from_vals[10];
     RandomPie {
       ins: ins,
       ovr: ovr,
@@ -38,8 +38,8 @@ impl RandomPie {
       swch: swch,
       jump: jump,
       join: join,
-      redo: redo,
       undo: undo,  
+      undo_c: undo_c,  
     }
   }
   pub fn no_cursors(&self) -> Self {
@@ -53,12 +53,12 @@ impl RandomPie {
       swch: 0,
       jump: 0,
       join: 0,
-      redo: self.redo,
       undo: self.undo,
+      undo_c: self.undo_c,
     }
   }
   pub fn total(&self) -> u32 {
-    self.ins + self.ovr + self.rem + self.mov + self.goto + self.make + self.swch + self.jump + self.join + self.redo + self.undo
+    self.ins + self.ovr + self.rem + self.mov + self.goto + self.make + self.swch + self.jump + self.join + self.undo
   }
   pub fn get_cmd_type<R: Rng>(&self, rng: &mut R) -> Cmdtype {
     let val = rng.gen_range(0, self.total());
@@ -79,9 +79,10 @@ impl RandomPie {
     if val < self.jump {return Cmdtype::Jump};
     let val = val - self.jump;
     if val < self.join {return Cmdtype::Join};
-    let val = val - self.join;
-    if val < self.redo {return Cmdtype::Redo};
     return Cmdtype::Undo;
+  }
+  pub fn undo_count(&self) -> u32 {
+    self.undo_c
   }
 }
 
