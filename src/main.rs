@@ -544,7 +544,7 @@ fn main2() {
       match e {
         //gives typed char or empty
         Event::Input(Input::Text(t)) => {
-          if t == "" || command_key_down {continue}
+          if t == "" || command_key_down || t.len() > 1 {continue}
           status = match status {
             Inputstatus::Insert(d, s) => {
               main_edit.take_action(Action::Cmd(Command::Ins(t,d.clone())), None);
