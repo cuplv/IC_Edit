@@ -2,8 +2,3 @@ Dependencies
 ------------
 brew install freetype
 brew install sdl2
-
-Semantic Options
-----------------
-How do you insert in front of a cursor?
-Why not insert between cursors?

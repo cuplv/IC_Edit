@@ -329,15 +329,15 @@ fn try_create_window(x: u32, y: u32) -> Result<GlutinWindow, String> {
 }
 
 // comment this to run interactive mode, uncomment for testing with a large stack
-fn main() {
-  use std::thread;
-  use std::thread::JoinHandle;
-  let child =
-    thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { main2() });
-  child.unwrap().join();
-}
+// fn main() {
+//   use std::thread;
+//   use std::thread::JoinHandle;
+//   let child =
+//     thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { main2() });
+//   child.unwrap().join();
+// }
 
-fn main2() {
+fn main() {
 
   //command-line
   let args = clap::App::new("IC_Edit")

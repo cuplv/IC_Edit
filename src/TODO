@@ -1,13 +1,9 @@
 line movement (up/down)
 viewparams window size ("line_count_before" "line_count_after")
-remove debug info
 blinking cursor, and colors
-more stats on screen
 ctrl-q to quit, free up esc key
-command line option for: controls over distribution of random command 
 more HUD info:
  -- cost/profiling
  -- number of lines
  -- number of characters
  -- number of cursors
-command line option for Naive (instead of Engine)
