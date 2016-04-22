@@ -111,14 +111,13 @@ fn infix_to_postfix(expr: String) -> Vec<String> {
 	postfix_expr.push((stack.pop().unwrap().to_string()));
     }
     //return postfix_expr.iter().cloned().collect::<String>();
-    println!("{:?}", postfix_expr);
     return postfix_expr;
 }
 
 fn postfix_parse(expr: Vec<String>) -> i32{
     //Maintain a stack of terminals
     //let mut stack: Vec<i32> = Vec::new();
-    let mut expr_stack = List::Nil;
+    let mut expr_list = List::Nil;
     //expr_stack = push(expr_stack, 3);
     //let (d, expr_stack_tmp) = pop(expr_stack);
     //expr_stack = Rc::try_unwrap(expr_stack_tmp).unwrap();
@@ -126,42 +125,42 @@ fn postfix_parse(expr: Vec<String>) -> i32{
     for c in expr.iter() {
         //Push terminals onto stack after type casting them to i32
 	if c.chars().nth(0).unwrap() >='0' && c.chars().nth(0).unwrap() <='9' {
-	        expr_stack = push(expr_stack, i32::from_str(c).unwrap());
+	        expr_list = push(expr_list, i32::from_str(c).unwrap());
 	//      push_char_onto_stack(expr_stack,8);  
         }
 	else if c=="+" || c=="*" || c=="-" || c=="/" {
 
-	let (d, stack) = pop(expr_stack);
-	expr_stack = Rc::try_unwrap(stack).unwrap();
+	let (d, list) = pop(expr_list);
+	expr_list = Rc::try_unwrap(list).unwrap();
 	let e1 = d.unwrap();
 
-	let (d, stack) = pop(expr_stack);
-	expr_stack = Rc::try_unwrap(stack).unwrap();
+	let (d, list) = pop(expr_list);
+	expr_list = Rc::try_unwrap(list).unwrap();
 	let e2 = d.unwrap();
 
 	//println!("{:?}",e1);
 	//}
 	    if c=="+" {
- 	        expr_stack = push(expr_stack, e1 + e2);
+ 	        expr_list = push(expr_list, e1 + e2);
             }
 	    else if c=="*" {
-	        expr_stack = push(expr_stack, e1 * e2);
+	        expr_list = push(expr_list, e1 * e2);
 	    }
 	    else if c=="/" {
-	        expr_stack = push(expr_stack, e2/e1);
+	        expr_list = push(expr_list, e2/e1);
 	    }
             else if c=="-" {
-	        expr_stack = push(expr_stack, e2 - e1);
+	        expr_list = push(expr_list, e2 - e1);
 	    }
         }
     } 
 
-    if length(&expr_stack) > 1 {
+    if length(&expr_list) > 1 {
 	println!("Check expression");
 	return 1;
     }
     else {
-	let (d, stack) = pop(expr_stack);
+	let (d, _) = pop(expr_list);
 	return d.unwrap();
    }
 }
