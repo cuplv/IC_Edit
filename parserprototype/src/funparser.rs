@@ -116,12 +116,9 @@ fn infix_to_postfix(expr: String) -> Vec<String> {
 
 fn postfix_parse(expr: Vec<String>) -> i32{
     //Maintain a stack of terminals
-    //let mut stack: Vec<i32> = Vec::new();
     let mut expr_list = List::Nil;
-    //expr_stack = push(expr_stack, 3);
-    //let (d, expr_stack_tmp) = pop(expr_stack);
-    //expr_stack = Rc::try_unwrap(expr_stack_tmp).unwrap();
-    //println!("{:?}", d.unwrap());
+    
+   
     for c in expr.iter() {
         //Push terminals onto stack after type casting them to i32
 	if c.chars().nth(0).unwrap() >='0' && c.chars().nth(0).unwrap() <='9' {
@@ -138,31 +135,20 @@ fn postfix_parse(expr: Vec<String>) -> i32{
 	expr_list = Rc::try_unwrap(list).unwrap();
 	let e2 = d.unwrap();
 
-	//println!("{:?}",e1);
-	//}
-	    if c=="+" {
- 	        expr_list = push(expr_list, e1 + e2);
-            }
-	    else if c=="*" {
-	        expr_list = push(expr_list, e1 * e2);
-	    }
-	    else if c=="/" {
-	        expr_list = push(expr_list, e2/e1);
-	    }
-            else if c=="-" {
-	        expr_list = push(expr_list, e2 - e1);
-	    }
+	let v: i32 = match c.as_ref(){
+		"+" => e1 + e2,
+		"-" => e1 - e2,
+		"*" => e1 * e2,
+		"/" => e2/e1,
+		_ => panic!(""),
+	};
+	
+	expr_list = push(expr_list, v);
         }
     } 
 
-    if length(&expr_list) > 1 {
-	println!("Check expression");
-	return 1;
-    }
-    else {
-	let (d, _) = pop(expr_list);
-	return d.unwrap();
-   }
+    let (d, _) = pop(expr_list);
+    return d.unwrap();
 }
 
 fn main() {
