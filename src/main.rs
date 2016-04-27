@@ -1,5 +1,14 @@
 #![feature(zero_one)]
 
+//-----------------
+// This version uses a default (small) stack that
+// can't handle larger documents. There is a hack
+// near fn main to test with a large stack, but it
+// can't show the graphics window at the same time
+// future work should move the more demanding code
+// into its own thread to solve this problem
+//-----------------
+
 // Default parameters
 // ------------------
 
