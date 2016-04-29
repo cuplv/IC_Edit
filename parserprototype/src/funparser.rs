@@ -6,10 +6,48 @@ mod funlist;
 
 use funlist::*;
 
+fn doit(c:char, input_stack:List<char>, postfix_expr:&mut Vec<String>) -> List<char> {
+  let mut stack = input_stack;
+  match stack.clone() {
+    List::Nil => {
+      //stack = List::Cons(c, stack);
+      stack = push(stack, c);
+      //continue;
+      return stack
+    },
+    List::Cons(cons) => {
+      let mut s_top = cons.hd.clone();
+      if s_top=='*' || s_top=='/' {
+        postfix_expr.push(s_top.to_string());
+      }
+      else {
+        stack = push(stack, s_top);
+      }
+      while !is_empty(stack.clone()) {
+        match stack.clone() {
+          List::Nil => (),
+          List::Cons(cons) => {
+            let s_top = cons.hd.clone();
+            if s_top=='*' || s_top=='/' {
+              postfix_expr.push(s_top.to_string());
+            }
+            else {
+              push(stack, s_top);
+              break;
+            }
+          }
+        }
+      }
+    }
+  };
+  push(stack, c)
+}
+
 fn infix_to_postfix(expr: String) -> Vec<String> {
 
     // Maintain a stack of operators and postfix string of operands
-    let mut stack: Vec<char> = Vec::new();
+  //let mut stack: Vec<char> = Vec::new();
+    let mut stack: List<char> = List::Nil;
     let mut postfix_expr: Vec<String> = Vec::new();
     let mut operand_stack: VecDeque<char> = VecDeque::new();
 
@@ -28,31 +66,8 @@ fn infix_to_postfix(expr: String) -> Vec<String> {
             postfix_expr.push(operand_str);
 
 	    // Pop stack until an operator of lower precedence is found, append the popped operators to the postfix string
-	    // This is done to give priority for division over multiplication
-            if stack.len() == 0 {
-                stack.push(c);
-                continue;
-            }
-            else {
-                let mut s_top = stack.pop().unwrap();
-                if s_top=='*' || s_top=='/' {
-                    postfix_expr.push(s_top.to_string());
-                }
-                else {
-                    stack.push(s_top);
-                }
-                while stack.len() > 0 {
-                    s_top = stack.pop().unwrap();
-                    if s_top=='*' || s_top=='/' {
-                        postfix_expr.push(s_top.to_string());
-                    }
-                    else {
-                        stack.push(s_top);
-                        break;
-                    }
-                }
-            }
-	    stack.push(c);
+	  // This is done to give priority for division over multiplication
+          stack = doit(c, stack, &mut postfix_expr);
 	}
 
 	else if c=='/' {
@@ -61,7 +76,7 @@ fn infix_to_postfix(expr: String) -> Vec<String> {
                 operand_str.push(operand_stack.pop_front().unwrap())
             }
             postfix_expr.push(operand_str);
-	    stack.push(c);
+	    push(stack, c);
         }
 
 	else if c=='+' || c=='-' {
@@ -73,31 +88,8 @@ fn infix_to_postfix(expr: String) -> Vec<String> {
             postfix_expr.push(operand_str);
 
             // Pop stack until an operator of equal precedence is found, append the popped operators to the postfix string
-            // This is done to give priority for multiplication and division
-	    if stack.len() == 0 {
-	        stack.push(c);
-		continue;
-	    }
-	    else {
-		let mut s_top = stack.pop().unwrap();
-		if s_top=='*' || s_top=='/' {
-		    postfix_expr.push(s_top.to_string());
-		}
-		else {
-		    stack.push(s_top);
-		}
-		while stack.len() > 0 {
-		    s_top = stack.pop().unwrap();
-		    if s_top=='*' || s_top=='/' {
-			postfix_expr.push(s_top.to_string());
-		    }
-		    else {
-			stack.push(s_top);
-		        break;
-		    }
-		}
-		stack.push(c);
-	    }
+          // This is done to give priority for multiplication and division
+          stack = doit(c, stack, &mut postfix_expr);
 	}
     }
     let mut operand_str = "".to_string();
@@ -107,9 +99,15 @@ fn infix_to_postfix(expr: String) -> Vec<String> {
     postfix_expr.push(operand_str);
 
     //Append all the remaining operators to the postfix string
-    while stack.len() > 0 {
-	postfix_expr.push((stack.pop().unwrap().to_string()));
-    }
+    
+    loop {
+      match stack {
+        List::Nil => break,
+        List::Cons(cons) => {
+          postfix_expr.push(cons.hd.to_string());
+          stack = *cons.tl;
+        }
+    }}
     //return postfix_expr.iter().cloned().collect::<String>();
     return postfix_expr;
 }

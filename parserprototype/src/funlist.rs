@@ -11,14 +11,17 @@ pub enum List<T> {
 
 #[derive(Clone,Debug,PartialEq,Eq)]
 pub struct Cons<T> {
-  hd: T,
-  tl: Rc<List<T>>,
+  pub hd: T,
+  pub tl: Rc<List<T>>,
 }
 
 pub struct Iter<'a, T:'a> {
   next: Option<&'a Cons<T>>,
 }
 
+pub fn is_empty<T>(list:List<T>) -> bool {
+  match list { List::Nil => false, _ => true}
+}
 
 pub fn push<T>(list: List<T>, item: T) -> List<T> {
   List::Cons(Cons{hd: item, tl:Rc::new(list)})
