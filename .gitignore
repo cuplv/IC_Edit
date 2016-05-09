@@ -3,5 +3,4 @@ _build
 *.out
 *~
 *.DS_Store
-Cargo.lock
 ~*
