@@ -1,6 +1,6 @@
 [root]
 name = "ICEdit"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "adapton 0.2.4 (git+https://github.com/cuplv/adapton.rust.git)",
  "clap 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
