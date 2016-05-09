@@ -1,0 +1,9 @@
+line movement (up/down)
+viewparams window size ("line_count_before" "line_count_after")
+blinking cursor, and colors
+ctrl-q to quit, free up esc key
+more HUD info:
+ -- cost/profiling
+ -- number of lines
+ -- number of characters
+ -- number of cursors

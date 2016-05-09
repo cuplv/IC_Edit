@@ -4,12 +4,14 @@
 
 use std::rc::Rc;
 
+#[derive(Debug,PartialEq,Eq)]
 pub struct List<T> {
   head: Link<T>,
 }
 
 type Link<T> = Option<Rc<Node<T>>>;
 
+#[derive(Debug,PartialEq,Eq)]
 struct Node<T> {
   elem: T,
   next: Link<T>,
@@ -28,7 +30,7 @@ impl<T> List<T> {
   }
 
   pub fn empty(&self) -> bool {
-    if let Some(_) = self.head {true} else {false}
+    if let Some(_) = self.head {false} else {true}
   }
 
   pub fn append(&self, elem: T) -> List<T> {

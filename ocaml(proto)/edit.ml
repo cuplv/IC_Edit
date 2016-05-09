@@ -122,7 +122,7 @@ let zip_to_cursor_no_save (l,c,r) target =
 	(* search right *)
 	match flip_to_cursor r l target with
 	| Some(r', l') -> (l', target, r')
-	| None -> failwith ("cursor not found: " ^ target)
+	| None -> (l,c,r) (* failwith ("cursor not found: " ^ target) *)
 
 let zip_to_cursor (l,c,r) target = 
 	if target = c then (l,c,r) else
@@ -316,12 +316,12 @@ let random_commands num =
 		in
 		let (c, act) =
 			match Random.int 100 with
-			| n when n < 18 -> (cursor_count, Command(Replace(rnd_char(),rnd_dir())))
-			| n when n < 63 -> (cursor_count, Command(Insert(rnd_char(),rnd_dir())))
-			| n when n < 81 -> (cursor_count, Command(Remove(rnd_dir())))
+			| n when n < 20 -> (cursor_count, Command(Replace(rnd_char(),rnd_dir())))
+			| n when n < 70 -> (cursor_count, Command(Insert(rnd_char(),rnd_dir())))
+			| n when n < 80 -> (cursor_count, Command(Remove(rnd_dir())))
 			| n when n < 99 -> (cursor_count, Command(Move(R)))
 			| _ ->
-			match Random.int 3 with
+			match Random.int 5 with
 			| 0 -> (cursor_count + 1, Command(Make(string_of_int cursor_count)))
 			| 1 -> (cursor_count, Command(SwitchTo(rnd_cursor())))
 			| 2 -> (cursor_count, Command(JumpTo(rnd_cursor())))
